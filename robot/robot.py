@@ -156,12 +156,7 @@ class Translator:
     def __init__(self):
         self.deepl_key = os.environ.get("DEEPL_KEY", "").strip()
         self.deepl_ok = bool(self.deepl_key)
-        self.used = {"deepl": 0, "github-models": 0, "microsoft": 0, "google": 0, "aucune": 0}
-        self.gh_token = os.environ.get("GITHUB_TOKEN", "").strip()
-        self.gh_ok = bool(self.gh_token)
-        self.ms_ok = False  # l'accès gratuit Microsoft a fermé (404)
-        self.ms_token = None
-        self.ms_time = 0
+        self.used = {"deepl": 0, "google": 0, "aucune": 0}
         self.last_error = None
         self.errors = []
 
@@ -178,85 +173,6 @@ class Translator:
         r.raise_for_status()
         return [t["text"] for t in r.json()["translations"]]
 
-    def _github_models(self, texts):
-        """IA gratuite de GitHub (GPT-4o mini), 20 textes par demande."""
-        out = []
-        for i in range(0, len(texts), 20):
-            chunk = texts[i:i + 20]
-            prompt = (
-                "Traduis en français naturel chaque texte de ce tableau JSON (actualité jeu vidéo). "
-                "Ne traduis pas les noms de jeux, de studios, de consoles ni de personnes. "
-                "Réponds uniquement avec un objet JSON {\"t\": [...]} contenant exactement "
-                f"{len(chunk)} traductions, dans le même ordre.\n\n" + json.dumps(chunk, ensure_ascii=False)
-            )
-            for attempt in range(3):
-                r = requests.post(
-                    "https://models.github.ai/inference/chat/completions",
-                    headers={"Authorization": f"Bearer {self.gh_token}", "Accept": "application/vnd.github+json",
-                             "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json"},
-                    json={"model": "openai/gpt-4o-mini", "temperature": 0,
-                          "response_format": {"type": "json_object"},
-                          "messages": [{"role": "user", "content": prompt}]},
-                    timeout=90,
-                )
-                if r.status_code == 429:
-                    wait = int(r.headers.get("retry-after", "0") or 0)
-                    if wait > 90:
-                        raise RuntimeError(f"quota GitHub Models atteint ({wait} s)")
-                    time.sleep(max(wait, 10))
-                    continue
-                if r.status_code >= 400:
-                    raise RuntimeError(f"GitHub Models {r.status_code} : {r.text[:200]}")
-                try:
-                    content = r.json()["choices"][0]["message"]["content"] or ""
-                    m = re.search(r"\{.*\}", content, re.S)
-                    res = json.loads(m.group(0) if m else content).get("t", [])
-                except Exception:
-                    raise RuntimeError(f"réponse illisible ({r.status_code}) : {r.text[:220]}")
-                if len(res) == len(chunk):
-                    break
-                res = None
-            if not res:
-                raise RuntimeError("GitHub Models : réponse incomplète")
-            out += [str(x) for x in res]
-            time.sleep(4)
-        return out
-
-    def _ms_auth(self):
-        if not self.ms_token or time.time() - self.ms_time > 480:
-            r = requests.get("https://edge.microsoft.com/translate/auth", headers={"User-Agent": UA}, timeout=20)
-            if r.status_code >= 400:
-                raise RuntimeError(f"auth {r.status_code} : {r.text[:200]}")
-            self.ms_token, self.ms_time = r.text.strip(), time.time()
-        return self.ms_token
-
-    def _microsoft(self, texts):
-        """Traducteur de Microsoft Edge : jusqu'à 100 textes par demande."""
-        out = []
-        for i in range(0, len(texts), 50):
-            chunk = texts[i:i + 50]
-            for attempt in range(3):
-                r = requests.post(
-                    "https://api-edge.cognitive.microsofttranslator.com/translate",
-                    params={"api-version": "3.0", "to": "fr"},
-                    headers={"Authorization": f"Bearer {self._ms_auth()}", "Content-Type": "application/json", "User-Agent": UA},
-                    json=[{"Text": t} for t in chunk], timeout=40,
-                )
-                if r.status_code == 429:
-                    time.sleep(5 * (attempt + 1))
-                    continue
-                if r.status_code == 401:
-                    self.ms_token = None
-                    continue
-                if r.status_code >= 400:
-                    raise RuntimeError(f"Microsoft {r.status_code} : {r.text[:200]}")
-                break
-            else:
-                raise RuntimeError(f"Microsoft {r.status_code}")
-            out += [d["translations"][0]["text"] for d in r.json()]
-            time.sleep(0.5)
-        return out
-
     def _gtx(self, text):
         for attempt in range(3):
             r = requests.post(
@@ -265,7 +181,7 @@ class Translator:
                 data={"q": text}, headers={"User-Agent": UA}, timeout=30,
             )
             if r.status_code == 429:
-                time.sleep(4 * (attempt + 1))
+                time.sleep([12, 30, 60][attempt])
                 continue
             r.raise_for_status()
             out = "".join(seg[0] for seg in r.json()[0] if seg and seg[0])
@@ -278,8 +194,13 @@ class Translator:
         """Traduit par paquets d'environ 3 000 caractères, une demande toutes les 0,4 s."""
         out = list(texts)
         fails = 0
+        streak = 0
         i = 0
+        started = time.time()
         while i < len(texts):
+            if streak >= 2 or time.time() - started > 420:
+                fails += len(texts) - i  # le reste attend le prochain passage
+                break
             j, size = i, 0
             while j < len(texts) and (j == i or size + len(texts[j]) < 3000):
                 size += len(texts[j]) + 1
@@ -293,10 +214,12 @@ class Translator:
                         res.append(self._gtx(t))
                         time.sleep(0.3)
                 out[i:j] = [r.strip() or t for r, t in zip(res, chunk)]
+                streak = 0
             except Exception as exc:
                 self.last_error = f"google: {exc}"
                 fails += j - i
-            time.sleep(0.4)
+                streak += 1
+            time.sleep(1.5)
             i = j
         if fails == len(texts):
             raise RuntimeError(f"Google Traduction ne répond pas ({self.last_error})")
@@ -317,23 +240,6 @@ class Translator:
                 log("DeepL indisponible, bascule :", exc)
                 self.errors.append(f"deepl: {exc}"[:300])
                 self.deepl_ok = False
-        if result is None and self.gh_ok:
-            try:
-                result = self._github_models(payload)
-                self.used["github-models"] += len(payload)
-            except Exception as exc:
-                log("GitHub Models indisponible :", exc)
-                self.errors.append(f"github-models: {exc}"[:300])
-                self.gh_ok = False
-        if result is None and self.ms_ok:
-            try:
-                result = self._microsoft(payload)
-                self.used["microsoft"] += len(payload)
-            except Exception as exc:
-                log("Microsoft indisponible, bascule sur Google :", exc)
-                self.last_error = f"microsoft: {exc}"
-                self.errors.append(self.last_error[:300])
-                self.ms_ok = False
         if result is None:
             try:
                 result = self._google(payload)
@@ -368,10 +274,12 @@ def translate_items(items, tr):
         for j, it in enumerate(chunk):
             it["title"], it["summary"] = res[2 * j], res[2 * j + 1]
             it["translated"] = res[2 * j] != it["title_orig"]
-            if it["translated"] or tr.used["aucune"] == 0:
+            tries = it.get("tries", 0) + 1
+            if it["translated"] or tries >= 3:
                 it.pop("pending", None)
+                it.pop("tries", None)
             else:
-                it["pending"] = True
+                it["pending"], it["tries"] = True, tries
 
 
 # ---------- doublons ----------
