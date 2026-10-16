@@ -1,0 +1,4 @@
+feedparser==6.0.14
+requests>=2.32
+deep-translator==1.11.4
+edge-tts==7.3.1

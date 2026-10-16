@@ -1,0 +1,23 @@
+{
+  "name": "anounisgaming",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AnounisGaming — actu jeux vidéo mondiale en français, rumeurs, prix PC",
+  "scripts": {
+    "build": "node scripts/build-web.js",
+    "android:prepare": "node scripts/build-web.js && npx cap add android && npx capacitor-assets generate --android && node scripts/patch-android.js && npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor-community/text-to-speech": "8.0.2",
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/browser": "8.0.5",
+    "@capacitor/core": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.5.3",
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource-variable/space-grotesk": "5.3.0"
+  }
+}

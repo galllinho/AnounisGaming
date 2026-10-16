@@ -1,0 +1,6 @@
+{
+  "appId": "fr.anounis.gaming",
+  "appName": "AnounisGaming",
+  "webDir": "dist",
+  "android": { "backgroundColor": "#0B0D12" }
+}
