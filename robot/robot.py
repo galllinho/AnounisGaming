@@ -504,8 +504,9 @@ def main():
         elif "article" in head:
             del head["article"]
         wants_art = head["rumor"] or n < 12
-        if wants_art and not head.get("igdb_tried") and not args.input:
-            head["igdb_tried"] = True
+        if wants_art and igdb.ok and not head.get("igdb_done") and not args.input:
+            head["igdb_done"] = True
+            head.pop("igdb_tried", None)
             igdb.illustrate(head)
 
     made = 0
