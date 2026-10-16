@@ -26,7 +26,7 @@ UA = "Mozilla/5.0 (Linux; Android 14) AnounisGaming/1.0 (+usage personnel)"
 KEEP_HOURS = 96          # durée de conservation des infos
 MAX_ITEMS = 450          # taille max du fil
 MAX_PER_SOURCE = 25      # entrées lues par source à chaque passage
-MAX_NEW_TRANSLATE = 120  # traductions max par passage
+MAX_NEW_TRANSLATE = 300  # traductions max par passage
 MAX_NEW_AUDIO = 30       # nouveaux audios max par passage
 VOICES = ["fr-FR-VivienneMultilingualNeural", "fr-FR-DeniseNeural"]
 
@@ -156,7 +156,10 @@ class Translator:
     def __init__(self):
         self.deepl_key = os.environ.get("DEEPL_KEY", "").strip()
         self.deepl_ok = bool(self.deepl_key)
-        self.used = {"deepl": 0, "google": 0, "aucune": 0}
+        self.used = {"deepl": 0, "microsoft": 0, "google": 0, "aucune": 0}
+        self.ms_ok = True
+        self.ms_token = None
+        self.ms_time = 0
         self.last_error = None
 
     def _deepl(self, texts):
@@ -171,6 +174,39 @@ class Translator:
             raise RuntimeError(f"DeepL {r.status_code}")
         r.raise_for_status()
         return [t["text"] for t in r.json()["translations"]]
+
+    def _ms_auth(self):
+        if not self.ms_token or time.time() - self.ms_time > 480:
+            r = requests.get("https://edge.microsoft.com/translate/auth", headers={"User-Agent": UA}, timeout=20)
+            r.raise_for_status()
+            self.ms_token, self.ms_time = r.text.strip(), time.time()
+        return self.ms_token
+
+    def _microsoft(self, texts):
+        """Traducteur de Microsoft Edge : jusqu'à 100 textes par demande."""
+        out = []
+        for i in range(0, len(texts), 50):
+            chunk = texts[i:i + 50]
+            for attempt in range(3):
+                r = requests.post(
+                    "https://api-edge.cognitive.microsofttranslator.com/translate",
+                    params={"api-version": "3.0", "to": "fr"},
+                    headers={"Authorization": f"Bearer {self._ms_auth()}", "Content-Type": "application/json", "User-Agent": UA},
+                    json=[{"Text": t} for t in chunk], timeout=40,
+                )
+                if r.status_code == 429:
+                    time.sleep(5 * (attempt + 1))
+                    continue
+                if r.status_code == 401:
+                    self.ms_token = None
+                    continue
+                r.raise_for_status()
+                break
+            else:
+                raise RuntimeError(f"Microsoft {r.status_code}")
+            out += [d["translations"][0]["text"] for d in r.json()]
+            time.sleep(0.5)
+        return out
 
     def _gtx(self, text):
         for attempt in range(3):
@@ -231,6 +267,14 @@ class Translator:
             except Exception as exc:
                 log("DeepL indisponible, bascule sur Google :", exc)
                 self.deepl_ok = False
+        if result is None and self.ms_ok:
+            try:
+                result = self._microsoft(payload)
+                self.used["microsoft"] += len(payload)
+            except Exception as exc:
+                log("Microsoft indisponible, bascule sur Google :", exc)
+                self.last_error = f"microsoft: {exc}"
+                self.ms_ok = False
         if result is None:
             try:
                 result = self._google(payload)
@@ -256,8 +300,8 @@ def translate_items(items, tr):
     for it in rest[MAX_NEW_TRANSLATE:]:
         it["title"], it["summary"], it["translated"], it["pending"] = it["title_orig"], it["summary_orig"], False, True
     rest = rest[:MAX_NEW_TRANSLATE]
-    for i in range(0, len(rest), 25):
-        chunk = rest[i:i + 25]
+    for i in range(0, len(rest), 40):
+        chunk = rest[i:i + 40]
         texts = []
         for it in chunk:
             texts += [it["title_orig"], it["summary_orig"]]
