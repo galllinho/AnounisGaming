@@ -25,7 +25,7 @@ const S = {
   status: null,
   read: new Set(store.get("read", [])),
   hidden: new Set(store.get("hiddenSources", [])),
-  settings: Object.assign({ token: "", itad: "", rate: 1, voice: "humaine", skin: "neon", briefNotif: true, briefTime: "07:40" }, store.get("settings", {})),
+  settings: Object.assign({ token: "", itad: "", rate: 1, voice: "humaine", skin: "neon", briefNotif: true, briefTime: "07:40", mute: [], themes: {} }, store.get("settings", {})),
   wish: store.get("wish", []),
   wishPrices: store.get("wishPrices", null),
   wishLoading: false,
@@ -34,6 +34,11 @@ const S = {
   plansTab: "prix",
   brief: store.get("brief", null),
   trCache: store.get("trCache", {}),
+  rumorsH: store.get("rumorsH", null),
+  releases: store.get("releases", null),
+  gamepass: store.get("gamepass", null),
+  info: store.get("info", {}),
+  reminders: store.get("reminders", {}),
   today: store.get("today", { d: "", n: 0 }),
   reddit: store.get("reddit", null),
   redditErr: null,
@@ -89,6 +94,8 @@ const ICON = {
   gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   palette: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.9 1.2-1.8-.5-1.1.2-2.2 1.4-2.2H17a4 4 0 0 0 4-4c0-5.5-4-10-9-10z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg>',
   bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
+  trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>',
+  cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>',
   sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L21 2M16 7l3 3M18 5l2 2"/></svg>'
 };
@@ -150,6 +157,9 @@ async function loadFeed(manual) {
     translatePendingOnPhone();
     gh("status.json").then(s => { S.status = s; if (S.tab === "reglages") render(); }).catch(() => {});
     gh("brief.json").then(b => { S.brief = b; store.set("brief", b); render(); }).catch(() => {});
+    gh("rumors.json").then(d => { S.rumorsH = d; store.set("rumorsH", d); }).catch(() => {});
+    gh("releases.json").then(d => { S.releases = d; store.set("releases", d); if (S.tab === "agenda") render(); }).catch(() => {});
+    if (!S.gamepass || Date.now() / 1000 - S.gamepass.updated > 86400) gh("gamepass.json").then(d => { S.gamepass = d; store.set("gamepass", d); }).catch(() => {});
     if (manual) toast("Fil à jour");
     loadReddit(manual);
   } catch (e) {
@@ -256,7 +266,7 @@ function allItems() {
 
 function heads() {
   if (!S.feed && !S.reddit) return [];
-  let list = allItems().filter(it => !S.hidden.has(it.source));
+  let list = allItems().filter(it => !S.hidden.has(it.source) && !isMuted(it));
   const f = S.filter;
   if (f === "ps5") list = list.filter(it => (it.platforms || []).includes("PS5"));
   else if (f === "pc") list = list.filter(it => (it.platforms || []).includes("PC"));
@@ -365,7 +375,7 @@ function viewFil() {
   else if (sk === "console" && !S.query) {
     const rail = list.slice(1, 9), rest = list.slice(9, S.shown);
     const err = S.error && S.feed ? `<p class="small err">${esc(S.error)}</p>` : "";
-    return `<div class="stack">${top}${consoleHero(list[0])}${briefCard()}${chips}${search}${err}
+    return `<div class="stack">${top}${eventBanner()}${consoleHero(list[0])}${briefCard()}${chips}${search}${err}
       ${rail.length ? `<div class="rail-t">Les dernières infos</div><div class="rail">${rail.map(tile).join("")}</div>` : ""}
       ${rest.map(it => card(it, false)).join("")}
       ${list.length > S.shown ? `<button class="more" data-act="more">Voir plus (${list.length - S.shown})</button>` : ""}</div>`;
@@ -375,7 +385,7 @@ function viewFil() {
     if (list.length > S.shown) body += `<button class="more" data-act="more">Voir plus (${list.length - S.shown})</button>`;
   }
   const err = S.error && S.feed ? `<p class="small err">${esc(S.error)}</p>` : "";
-  return `<div class="stack">${top}${briefCard()}${chips}${search}${err}${body}</div>`;
+  return `<div class="stack">${top}${eventBanner()}${briefCard()}${chips}${search}${err}${rumorBoardCard()}${body}</div>`;
 }
 
 function viewSetup() {
@@ -460,6 +470,8 @@ async function searchGames() {
   P.loading = true; render();
   try {
     P.results = await http("GET", `https://api.isthereanydeal.com/games/search/v1?key=${itadKey()}&title=${encodeURIComponent(q)}&results=12`);
+    if (P.autoOpen && P.results.length && norm(P.results[0].title) === norm(P.autoOpen)) { P.autoOpen = null; P.loading = false; return loadPrices(P.results[0]); }
+    P.autoOpen = null;
   } catch (e) { P.error = "Recherche impossible. Vérifie ta clé IsThereAnyDeal dans Réglages."; }
   P.loading = false; render();
 }
@@ -475,6 +487,7 @@ async function loadPrices(game) {
   const P = S.price;
   P.game = game; P.rows = null; P.low = null; P.loading = true; P.error = null; render();
   try {
+    loadInfo(game.id).then(() => { if (S.price.game === game) render(); }).catch(() => {});
     const r = (await fetchPrices([game.id]))[game.id];
     P.rows = r.rows; P.low = r.low;
     if (!P.rows.length) P.error = "Aucune offre trouvée pour ce jeu dans les stores suivis.";
@@ -617,7 +630,7 @@ function viewPlans() {
         const best = P.rows[0], w = wishOf(P.game.id);
         const low = P.low ? `<p class="small muted">Plus bas historique en France : <b class="num">${fmtLocal(P.low.amount, P.low.currency)}</b>${isDeal(best, P.low) ? ' · <span class="ok">bonne affaire</span>' : ""}</p>` : "";
         res = `<button class="btn" data-act="price-back">${ICON.back} Autres résultats</button>
-          <div class="stack"><h2>${esc(P.game.title)}</h2>${low}
+          <div class="stack"><h2>${esc(P.game.title)}</h2>${gameSheet(P.game)}${low}
           <button class="btn ${w ? "" : "primary "}block" data-act="wish-add">${ICON.bell} ${w ? `Suivi sous ${fmtEur(w.target)} · modifier` : "Suivre ce jeu et m'alerter"}</button></div>
           <div class="card">${P.rows.map(priceRow).join("")}</div>
           <p class="tiny muted">Conversion au taux BCE du jour. Les prix étrangers peuvent exiger un compte, une carte ou une adresse du pays.</p>
@@ -664,6 +677,209 @@ function viewPlans() {
   return `<div class="stack">${head}${seg}${body}</div>`;
 }
 
+/* ===================== V3 ===================== */
+
+/* ----- filtres anti-bruit ----- */
+const THEMES = {
+  esport: { name: "Esport", words: ["esport", "e-sport", "tournament", "tournoi", "championship", "championnat", "lcs ", "lec ", "major "] },
+  mobile: { name: "Jeux mobiles", words: ["mobile", " ios", "android", "iphone", "gacha"] },
+  hardware: { name: "Matériel PC", words: ["gpu", "rtx", "radeon", "geforce", " cpu", "processor", "processeur", "monitor", "moniteur", "ssd", "laptop", "carte graphique", "motherboard"] },
+  deals: { name: "Articles promos", words: ["deal", "deals", "best price", "discount", "réduction", "soldes", "bon plan", "promo "] },
+  cinema: { name: "Films et séries", words: ["movie", " film", "série", "tv show", "netflix", "hbo", "mcu", "marvel studios", "box office"] }
+};
+function isMuted(it) {
+  const t = ` ${it.title} ${it.title_orig} ${it.summary || ""} `.toLowerCase();
+  for (const w of S.settings.mute || []) if (w && t.includes(w.toLowerCase())) return true;
+  for (const [k, th] of Object.entries(THEMES)) if ((S.settings.themes || {})[k] && th.words.some(w => t.includes(w))) return true;
+  return false;
+}
+function guessSubject(it) {
+  if (it.game) return it.game;
+  const m = (it.title_orig || "").match(/((?:[A-Z][\w'’:-]*|\d+)(?:\s+(?:[A-Z][\w'’:-]*|\d+|of|the))+)/);
+  return m ? m[1] : "";
+}
+function muteSubject(it) {
+  const v = prompt("Masquer les infos qui contiennent :", guessSubject(it));
+  if (!v || !v.trim()) return;
+  S.settings.mute = [...new Set([...(S.settings.mute || []), v.trim()])];
+  saveSettings(); closeSheet(); toast(`« ${v.trim()} » masqué`);
+}
+
+/* ----- mode événement ----- */
+const EVENTS = [
+  { key: "sop", name: "State of Play", re: /state of play/i, live: "https://www.youtube.com/@PlayStation/live" },
+  { key: "direct", name: "Nintendo Direct", re: /nintendo direct/i, live: "https://www.youtube.com/@NintendoFrance/live" },
+  { key: "xbox", name: "Xbox Games Showcase", re: /xbox (games )?showcase|xbox developer direct/i, live: "https://www.youtube.com/@Xbox/live" },
+  { key: "tga", name: "The Game Awards", re: /game awards/i, live: "https://www.youtube.com/@thegameawards/live" },
+  { key: "sgf", name: "Summer Game Fest", re: /summer game fest/i, live: "https://www.youtube.com/@summergamefest/live" },
+  { key: "gamescom", name: "Gamescom", re: /gamescom|opening night live/i, live: "https://www.youtube.com/@gamescom/live" },
+  { key: "tgs", name: "Tokyo Game Show", re: /tokyo game show|東京ゲームショウ/i, live: "https://www.youtube.com/@TokyoGameShow/live" }
+];
+const evText = it => `${it.title} ${it.title_orig}`;
+function activeEvent() {
+  const since = Date.now() / 1000 - 3 * 3600;
+  const recent = allItems().filter(it => it.published >= since);
+  let best = null;
+  for (const ev of EVENTS) {
+    const n = recent.filter(it => ev.re.test(evText(it))).length;
+    if (n >= 3 && (!best || n > best.n)) best = { ev, n };
+  }
+  return best;
+}
+function eventBanner() {
+  const a = activeEvent();
+  if (!a) return "";
+  return `<button class="live" data-event="${a.ev.key}"><span class="live-dot"></span><div class="grow"><b>En direct · ${esc(a.ev.name)}</b><div class="tiny">${a.n} annonces ces 3 dernières heures · suivi en temps réel</div></div>${ICON.ext.replace("<svg", '<svg width="18" height="18"')}</button>`;
+}
+let eventTimer = null;
+function openEvent(key) {
+  const ev = EVENTS.find(e => e.key === key); if (!ev) return;
+  const draw = () => {
+    const since = Date.now() / 1000 - 12 * 3600;
+    const list = allItems().filter(it => it.published >= since && ev.re.test(evText(it)));
+    $("#sheet-root").innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="sheet-in stack">
+      <div class="row between"><button class="iconbtn" data-act="close" aria-label="Retour">${ICON.back}</button><span class="tiny muted">Actualisé ${ago(Date.now() / 1000)} · toutes les 2 min</span></div>
+      <h1 style="font-size:26px">${esc(ev.name)}</h1>
+      <button class="btn primary block" data-url="${ev.live}">${ICON.play.replace("<svg", '<svg width="16" height="16" fill="currentColor"')} Regarder le direct</button>
+      ${list.length ? list.map(it => card(it, false)).join("") : '<p class="muted">Les annonces apparaîtront ici dès qu\'elles tombent.</p>'}</div></div>`;
+  };
+  draw();
+  document.body.style.overflow = "hidden";
+  clearInterval(eventTimer);
+  eventTimer = setInterval(async () => {
+    if (!$("#sheet-root").innerHTML) return clearInterval(eventTimer);
+    await Promise.all([loadFeed(false), loadReddit(true)]);
+    if ($("#sheet-root").innerHTML) draw();
+  }, 120000);
+}
+
+/* ----- tableau des rumeurs ----- */
+function rumorStats() {
+  const list = Object.entries((S.rumorsH && S.rumorsH.rumors) || {}).map(([id, r]) => ({ id, ...r })).sort((a, b) => b.first - a.first);
+  const by = {};
+  for (const r of list) for (const src of r.sources || []) {
+    const o = by[src] || (by[src] = { source: src, total: 0, ok: 0, ko: 0 });
+    o.total++; if (r.status === "confirme") o.ok++; if (r.status === "dementi") o.ko++;
+  }
+  const insiders = Object.values(by).sort((a, b) => (b.ok - b.ko) - (a.ok - a.ko) || b.total - a.total);
+  return { list, insiders, ok: list.filter(r => r.status === "confirme").length, ko: list.filter(r => r.status === "dementi").length };
+}
+function rumorBoardCard() {
+  if (S.filter !== "rumeurs" || !S.rumorsH) return "";
+  const st = rumorStats();
+  return `<button class="brief" data-act="rumor-board" style="text-align:left"><div class="row" style="gap:12px"><span class="brief-ic">${ICON.trophy}</span>
+    <div class="grow"><b>Tableau des rumeurs</b><div class="tiny muted">${st.list.length} suivies · ${st.ok} confirmées · ${st.ko} démenties · classement des insiders</div></div></div></button>`;
+}
+const ST_LABEL = { rumeur: ["En attente", "b-rumor"], confirme: ["Confirmée", "b-off"], dementi: ["Démentie", "b-ko"] };
+function openRumorBoard() {
+  const st = rumorStats();
+  const fmtD = ts => new Date(ts * 1000).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  $("#sheet-root").innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="sheet-in stack">
+    <div class="row between"><button class="iconbtn" data-act="close" aria-label="Retour">${ICON.back}</button></div>
+    <h1 style="font-size:26px">Tableau des rumeurs</h1>
+    <div class="stats"><div><b>${st.list.length}</b><span>suivies</span></div><div><b class="ok">${st.ok}</b><span>confirmées</span></div><div><b class="err">${st.ko}</b><span>démenties</span></div></div>
+    <div class="section-t">Classement des sources</div>
+    <div class="card">${st.insiders.length ? st.insiders.map((o, i) => `<div class="rank"><span class="pos">${i + 1}</span><div class="grow"><b>${esc(o.source)}</b><div class="tiny muted">${o.total} rumeur${o.total > 1 ? "s" : ""} relayée${o.total > 1 ? "s" : ""}</div></div>
+      <span class="tiny"><span class="ok">${o.ok} ✓</span> · <span class="err">${o.ko} ✗</span></span><b class="num">${o.ok + o.ko ? Math.round(100 * o.ok / (o.ok + o.ko)) + " %" : "—"}</b></div>`).join("") : '<p class="muted" style="padding:12px">Pas encore assez de rumeurs suivies.</p>'}</div>
+    <p class="tiny muted">Le taux de réussite se calcule sur les rumeurs déjà tranchées (confirmées ou démenties). Il s'affine avec le temps.</p>
+    <div class="section-t">Historique (60 jours)</div>
+    <div class="card">${st.list.map(r => `<button class="rank" data-${findItem(r.id) ? "open" : "url"}="${esc(findItem(r.id) ? r.id : r.url)}" style="width:100%;text-align:left">
+      <div class="grow"><b class="small">${esc(r.title)}</b><div class="tiny muted">${fmtD(r.first)} · ${esc((r.sources || []).join(", "))}${r.proof ? " · confirmé par " + esc(r.proof.source) : ""}</div></div>
+      <span class="badge ${ST_LABEL[r.status][1]}">${ST_LABEL[r.status][0]}</span></button>`).join("")}</div></div></div>`;
+  document.body.style.overflow = "hidden";
+}
+
+/* ----- fiche jeu (IsThereAnyDeal + catalogue + actu) ----- */
+const norm = t => (t || "").toLowerCase().replace(/[™®©]/g, "").replace(/[^a-z0-9à-ÿ]+/g, " ").trim();
+function inGamePass(title) {
+  const n = norm(title);
+  return !!(S.gamepass && S.gamepass.titles && S.gamepass.titles.some(t => { const m = norm(t); return m === n || m.startsWith(n + " ") || n.startsWith(m + " "); }));
+}
+function relatedNews(title) {
+  const n = norm(title); if (n.length < 3) return [];
+  return allItems().filter(it => norm(`${it.title} ${it.title_orig}`).includes(n)).slice(0, 5);
+}
+async function loadInfo(id) {
+  if (S.info[id] && Date.now() - S.info[id].at < 7 * 86400e3) return S.info[id];
+  const d = await http("GET", `https://api.isthereanydeal.com/games/info/v2?key=${itadKey()}&id=${encodeURIComponent(id)}`);
+  S.info[id] = Object.assign({ at: Date.now() }, d);
+  store.set("info", S.info);
+  return S.info[id];
+}
+function gameSheet(game) {
+  const info = S.info[game.id];
+  const rel = (S.releases && S.releases.games || []).find(g => norm(g.name) === norm(game.title));
+  const news = relatedNews(game.title);
+  const reviews = info && (info.reviews || []).filter(r => r.score != null).slice(0, 4);
+  const art = info && info.assets && (info.assets.boxart || info.assets.banner400) || (game.assets && game.assets.boxart);
+  const date = info && info.releaseDate ? new Date(info.releaseDate).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : null;
+  return `<div class="gsheet">
+    ${art ? `<img class="gcover" src="${esc(art)}" alt="">` : ""}
+    <div class="grow stack" style="gap:6px">
+      ${date ? `<div class="tiny muted">Sortie : ${date}</div>` : ""}
+      ${info && info.developers && info.developers.length ? `<div class="tiny muted">${esc(info.developers.map(d => d.name).join(", "))}</div>` : ""}
+      <div class="badges">${inGamePass(game.title) ? '<span class="badge b-pc">PC Game Pass</span>' : ""}${(info && info.tags || []).slice(0, 3).map(t => `<span class="badge b-more">${esc(t)}</span>`).join("")}</div>
+      ${info && info.players && info.players.recent ? `<div class="tiny muted">${info.players.recent.toLocaleString("fr-FR")} joueurs Steam en ce moment</div>` : ""}
+    </div></div>
+    ${reviews && reviews.length ? `<div class="scores">${reviews.map(r => `<a class="score" href="#" data-url="${esc(r.url || "")}"><b class="num">${r.score}</b><span>${esc(r.source)}</span></a>`).join("")}</div>` : ""}
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      ${rel && rel.ttb ? `<span class="chip" style="cursor:default">Durée : ${rel.ttb} h</span>` : ""}
+      <button class="btn" data-url="https://howlongtobeat.com/?q=${encodeURIComponent(game.title)}">${ICON.ext} Durée de vie</button>
+      <button class="btn" data-url="https://www.playstation.com/fr-fr/ps-plus/games/">${ICON.ext} Catalogue PS Plus</button>
+    </div>
+    ${news.length ? `<div class="section-t">Actu récente</div>${news.map(it => card(it, false)).join("")}` : ""}`;
+}
+function openGameFromArticle(name) {
+  closeSheet();
+  S.tab = "plans"; S.plansTab = "prix"; S.price.platform = "pc"; S.price.q = name;
+  S.price.autoOpen = name;
+  render(); searchGames();
+}
+
+/* ----- agenda : événements et sorties ----- */
+const hash = s => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7);
+async function toggleReminder(g) {
+  const id = 8000 + Math.abs(hash(String(g.id))) % 900000;
+  if (S.reminders[g.id]) {
+    delete S.reminders[g.id];
+    if (Plug.LocalNotifications) Plug.LocalNotifications.cancel({ notifications: [{ id }] }).catch(() => {});
+    toast("Rappel retiré");
+  } else {
+    S.reminders[g.id] = { name: g.name, date: g.date };
+    if (await askNotifPermission()) {
+      const at = new Date(g.date * 1000); at.setHours(9, 0, 0, 0);
+      if (at > new Date()) Plug.LocalNotifications.schedule({ notifications: [{ id, title: `${g.name} sort aujourd'hui`, body: `Disponible sur ${g.platforms.join(" et ")}. Bon jeu !`, schedule: { at, allowWhileIdle: true } }] }).catch(() => {});
+    }
+    toast("Rappel le jour de la sortie à 9 h");
+  }
+  store.set("reminders", S.reminders); render();
+}
+function viewAgenda() {
+  const a = activeEvent();
+  const games = (S.releases && S.releases.games) || [];
+  const groups = {};
+  for (const g of games) {
+    const d = new Date(g.date * 1000);
+    const k = d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+    (groups[k] = groups[k] || []).push(g);
+  }
+  const wishDates = S.wish.map(w => ({ w, info: S.info[w.id] })).filter(x => x.info && x.info.releaseDate && new Date(x.info.releaseDate) > new Date());
+  return `<div class="stack">
+    <header class="top"><div><div class="brand">Agenda</div><div class="updated">Directs, sorties à venir et rappels</div></div></header>
+    ${a ? eventBanner() : ""}
+    <div class="section-t">Directs des éditeurs</div>
+    <div class="regions">${EVENTS.slice(0, 6).map(ev => `<button class="btn" data-url="${ev.live}">${esc(ev.name)}</button>`).join("")}</div>
+    ${wishDates.length ? `<div class="section-t">Tes jeux suivis</div><div class="card">${wishDates.map(x => `<div class="rank"><div class="grow"><b>${esc(x.w.title)}</b></div><span class="tiny">${new Date(x.info.releaseDate).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}</span></div>`).join("")}</div>` : ""}
+    <div class="section-t">Sorties PS5 et PC à venir</div>
+    ${games.length ? Object.entries(groups).map(([m, list]) => `<div class="tiny muted" style="text-transform:capitalize">${esc(m)}</div><div class="card">${list.map(g => `<div class="rel-row">
+        ${g.cover ? `<img src="${esc(g.cover)}" alt="" loading="lazy">` : '<img alt="">'}
+        <div class="grow"><b>${esc(g.name)}</b><div class="tiny muted">${new Date(g.date * 1000).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })} · ${g.platforms.join(", ")}${g.ttb ? ` · ${g.ttb} h` : ""}</div>
+        ${g.genres && g.genres.length ? `<div class="tiny muted">${esc(g.genres.join(", "))}</div>` : ""}</div>
+        <button class="iconbtn${S.reminders[g.id] ? " on" : ""}" data-remind="${g.id}" aria-label="Rappel le jour de la sortie">${ICON.bell}</button></div>`).join("")}</div>`).join("")
+      : `<div class="box stack"><p class="muted">Le calendrier des sorties vient d'IGDB. Ajoute les clés Twitch gratuites au robot pour l'activer (voir le README du dépôt) : ça donne aussi les images officielles et les durées de vie.</p></div>`}
+  </div>`;
+}
+
 /* ----- Réglages ----- */
 function viewReglages() {
   const srcs = [...new Set(allItems().map(i => i.source))].sort((a, b) => a.localeCompare(b));
@@ -683,6 +899,11 @@ function viewReglages() {
     <div class="box stack"><h3>Lecture audio</h3>
       <div class="switch"><span>Voix humaine (préparée par le robot)<div class="tiny muted">Sinon, voix Android</div></span><input type="checkbox" data-set="voice" ${S.settings.voice === "humaine" ? "checked" : ""}></div>
       <div class="field"><label for="rate">Vitesse : <span class="num">${S.settings.rate.toFixed(1)}×</span></label><input id="rate" type="range" min="0.8" max="1.5" step="0.1" value="${S.settings.rate}" data-set="rate"></div>
+    </div>
+    <div class="box stack"><h3>Filtres anti-bruit</h3>
+      ${Object.entries(THEMES).map(([k, th]) => `<label class="switch"><span>Masquer : ${th.name}</span><input type="checkbox" data-theme="${k}" ${(S.settings.themes || {})[k] ? "checked" : ""}></label>`).join("")}
+      <div class="field"><label for="mutew">Mots ou jeux masqués</label><div class="row"><input id="mutew" class="input grow" placeholder="ex. Fortnite" autocapitalize="off"><button class="btn" data-act="mute-add">Ajouter</button></div></div>
+      <div class="badges">${(S.settings.mute || []).map(w => `<button class="badge b-more" data-unmute="${esc(w)}">${esc(w)} ✕</button>`).join("") || '<span class="tiny muted">Aucun pour l\'instant. Astuce : « Masquer ce sujet » dans un article.</span>'}</div>
     </div>
     <div class="box stack"><h3>Sources affichées</h3>
       ${srcs.length ? srcs.map(n => `<label class="switch"><span>${esc(n)}</span><input type="checkbox" data-src="${esc(n)}" ${S.hidden.has(n) ? "" : "checked"}></label>`).join("") : '<p class="small muted">Disponible après le chargement du fil.</p>'}
@@ -729,10 +950,12 @@ function openArticle(id) {
       ${media}${meta(it)}<h1>${esc(it.title)}</h1>${warn}
       ${story}${orig}
       <div class="btns"><button class="btn primary" data-listen="${it.id}">${ICON.headphones} Écouter</button><button class="btn" data-url="${esc(it.url)}">${ICON.ext} Lire la source</button></div>
+      <div class="btns">${it.game ? `<button class="btn" data-gamesheet="${esc(it.game)}">${ICON.tag} Fiche du jeu</button>` : ""}<button class="btn" data-mute="${it.id}">${ICON.close} Masquer ce sujet</button></div>
       ${gallery}${also}</div></div>`;
   document.body.style.overflow = "hidden";
 }
 function closeSheet() {
+  clearInterval(eventTimer);
   $("#sheet-root").innerHTML = "";
   document.body.style.overflow = "";
   if (S.tab === "fil") render();
@@ -767,6 +990,7 @@ async function playItem(it) {
       if (P.url && P.url.startsWith("blob:")) URL.revokeObjectURL(P.url);
       P.url = src;
       P.audio.src = P.url; P.audio.playbackRate = S.settings.rate;
+      try { if ("mediaSession" in navigator) { navigator.mediaSession.metadata = new MediaMetadata({ title: it.title, artist: it.source, album: "AnounisGaming" }); navigator.mediaSession.setActionHandler("nexttrack", () => nextTrack()); } } catch {}
       await P.audio.play();
       return;
     } catch { if (P.item !== it || P.tts) return; }
@@ -806,14 +1030,14 @@ function renderPlayer() {
 
 /* ---------- navigation ---------- */
 function renderNav() {
-  const tabs = [["fil", "Fil", ICON.news], ["plans", "Bons plans", ICON.tag], ["reglages", "Réglages", ICON.gear]];
+  const tabs = [["fil", "Fil", ICON.news], ["plans", "Bons plans", ICON.tag], ["agenda", "Agenda", ICON.cal], ["reglages", "Réglages", ICON.gear]];
   $("#nav").innerHTML = `<div class="nav-in">${tabs.map(([k, l, i], n) => `<button data-tab="${k}" ${S.tab === k ? 'aria-current="page"' : ""}>${i}<span><span class="slot">${n + 1} </span>${l}</span></button>`).join("")}</div>`;
 }
 function render() {
   const app = $("#app");
   const focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.input;
   const caret = focused ? document.activeElement.selectionStart : null;
-  app.innerHTML = S.tab === "fil" ? viewFil() : S.tab === "plans" ? viewPlans() : viewReglages();
+  app.innerHTML = S.tab === "fil" ? viewFil() : S.tab === "plans" ? viewPlans() : S.tab === "agenda" ? viewAgenda() : viewReglages();
   renderNav();
   if (focused) { const el = app.querySelector(`[data-input="${focused}"]`); if (el) { el.focus(); try { el.setSelectionRange(caret, caret); } catch {} } }
 }
@@ -827,7 +1051,13 @@ document.addEventListener("click", e => {
   if (d.yt) { t.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(d.yt)}?autoplay=1&playsinline=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" title="Vidéo"></iframe>`; t.removeAttribute("data-yt"); t.style.backgroundImage = "none"; return; }
   if (d.listen) { const it = findItem(d.listen); P.queue = []; P.idx = -1; if (it) playItem(it); return; }
   if (d.filter) { S.filter = d.filter; store.set("filter", S.filter); S.shown = PAGE; render(); window.scrollTo(0, 0); return; }
+  if (d.tab === "agenda") S.wish.forEach(w => { if (!S.info[w.id] && S.settings.itad) loadInfo(w.id).then(() => S.tab === "agenda" && render()).catch(() => {}); });
   if (d.tab) { S.tab = d.tab; if (d.tab === "plans") { loadFree(); if (S.wish.length && (!S.wishPrices || Date.now() - S.wishPrices.at > 3600e3)) checkWishlist(false); } render(); window.scrollTo(0, 0); return; }
+  if (d.event) return openEvent(d.event);
+  if (d.mute) { const it = findItem(d.mute); if (it) muteSubject(it); return; }
+  if (d.gamesheet) return openGameFromArticle(d.gamesheet);
+  if (d.remind) { const g = ((S.releases && S.releases.games) || []).find(x => String(x.id) === d.remind); if (g) toggleReminder(g); return; }
+  if (d.unmute != null) { S.settings.mute = (S.settings.mute || []).filter(w => w !== d.unmute); saveSettings(); return render(); }
   if (d.plans) { S.plansTab = d.plans; if (d.plans === "gratuits") loadFree(); return render(); }
   if (d.plat) { S.price.platform = d.plat; S.price.results = null; S.price.game = null; S.price.rows = null; S.price.psq = ""; S.price.error = null; return render(); }
   if (d.wishDel) { S.wish = S.wish.filter(w => w.id !== d.wishDel); saveWish(); return render(); }
@@ -861,6 +1091,8 @@ document.addEventListener("click", e => {
     case "wish-add": return addWish(S.price.game, S.price.rows && S.price.rows[0]);
     case "wish-check": return checkWishlist(true);
     case "brief-open": return openBrief();
+    case "rumor-board": return openRumorBoard();
+    case "mute-add": { const v = ($("#mutew") || {}).value; if (v && v.trim()) { S.settings.mute = [...new Set([...(S.settings.mute || []), v.trim()])]; saveSettings(); render(); } return; }
     case "brief-play": {
       const b = S.brief; if (!b) return;
       P.queue = []; P.idx = -1;
@@ -872,6 +1104,7 @@ document.addEventListener("change", e => {
   const t = e.target;
   if (t.dataset.src) { t.checked ? S.hidden.delete(t.dataset.src) : S.hidden.add(t.dataset.src); store.set("hiddenSources", [...S.hidden]); }
   if (t.dataset.set === "voice") { S.settings.voice = t.checked ? "humaine" : "android"; saveSettings(); }
+  if (t.dataset.theme) { S.settings.themes = Object.assign({}, S.settings.themes, { [t.dataset.theme]: t.checked }); saveSettings(); }
   if (t.dataset.set === "briefNotif") { S.settings.briefNotif = t.checked; saveSettings(); setupBriefNotification(); }
   if (t.dataset.set === "briefTime") { S.settings.briefTime = t.value || "07:40"; saveSettings(); setupBriefNotification(); }
   if (t.dataset.set === "rate") { S.settings.rate = +t.value; saveSettings(); P.audio.playbackRate = S.settings.rate; render(); }
