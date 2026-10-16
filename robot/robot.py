@@ -512,6 +512,12 @@ def main():
     if not args.no_audio:
         made = make_audio(items, out_dir)
 
+    # V3 : historique des rumeurs, sorties à venir, Game Pass
+    heads_now = [h for h, _ in groups]
+    n_rumors = extras.update_rumor_history(out_dir / "rumors.json", heads_now, now)
+    n_releases = None if args.input else extras.igdb_releases(igdb, out_dir / "releases.json", now)
+    gamepass = None if args.input else extras.gamepass_catalog(out_dir / "gamepass.json", now)
+
     # brief du matin
     brief_path = out_dir / "brief.json"
     old_brief = None
@@ -550,6 +556,9 @@ def main():
         "extras_errors": [e for e in (ia["error"], igdb.error) if e],
         "igdb": igdb.ok,
         "brief": brief.get("date") if brief else None,
+        "rumors_tracked": n_rumors,
+        "releases": n_releases,
+        "gamepass": gamepass,
         "audio_new": made,
     }, ensure_ascii=False, indent=1), "utf-8")
     heads = sum(1 for it in items if not it.get("group"))

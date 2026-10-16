@@ -273,3 +273,121 @@ def build_brief(items, old_brief):
     parts.append("C'est tout pour ce matin. Bonne journée, et bon jeu !")
     text = "\n\n".join(parts)
     return {"date": today, "label": date_txt, "items": [it["id"] for it in picked], "text": text, "audio": False}, True
+
+
+# ---------- V3 : historique des rumeurs ----------
+
+def _words(t):
+    t = re.sub(r"[^\w\s]", " ", (t or "").lower())
+    return {w for w in t.split() if len(w) > 3}
+
+
+def update_rumor_history(path, heads, now):
+    """Garde la trace de chaque rumeur sur 60 jours et met à jour son statut (confirmée, démentie)."""
+    try:
+        hist = json.loads(path.read_text("utf-8")) if path.exists() else {}
+    except Exception:
+        hist = {}
+    rumors = hist.get("rumors", {})
+    officials = [h for h in heads if h["kind"] == "officiel" or any(a["source"] == "PlayStation Blog" for a in h.get("also", []))]
+    for h in heads:
+        art = h.get("article")
+        if not art:
+            continue
+        r = rumors.get(h["id"]) or {"first": h["published"], "status": "rumeur", "changed": None}
+        r.update({"title": h["title"], "title_orig": h["title_orig"], "url": h["url"], "reliability": h.get("reliability"),
+                  "sources": sorted({w["source"] for w in art.get("who", [])}), "game": h.get("game")})
+        if art["status"] != "rumeur" and r["status"] == "rumeur":
+            r["status"], r["changed"] = art["status"], now
+        rumors[h["id"]] = r
+    # confirmation par une annonce officielle publiée plus tard sur le même sujet
+    for rid, r in rumors.items():
+        if r["status"] != "rumeur":
+            continue
+        rw = _words(r["title_orig"]) | ({w for w in _words(r.get("game"))} if r.get("game") else set())
+        for o in officials:
+            if o["published"] <= r["first"] + 3600:
+                continue
+            ow = _words(o["title_orig"])
+            if len(rw & ow) >= 3 or (r.get("game") and r["game"].lower() in o["title_orig"].lower()):
+                r["status"], r["changed"], r["proof"] = "confirme", now, {"title": o["title"], "url": o["url"], "source": o["source"]}
+                break
+    rumors = {k: v for k, v in rumors.items() if now - v["first"] < 60 * 86400}
+    data = {"updated": now, "rumors": rumors}
+    path.write_text(json.dumps(data, ensure_ascii=False), "utf-8")
+    return len(rumors)
+
+
+# ---------- V3 : sorties à venir et durées de vie (IGDB) ----------
+
+def igdb_releases(igdb, path, now):
+    """Sorties PS5 et PC des 60 prochains jours les plus attendues, avec jaquette et durée de vie si connue."""
+    if not igdb.ok:
+        return None
+    try:
+        tok = igdb._auth()
+        hdr = {"Client-ID": igdb.cid, "Authorization": f"Bearer {tok}"}
+        q = (f"fields game.name,game.cover.image_id,game.hypes,game.slug,game.summary,game.genres.name,date,platform; "
+             f"where date >= {now} & date < {now + 60 * 86400} & platform = (6,167) & game.hypes > 3; "
+             "sort date asc; limit 200;")
+        r = requests.post("https://api.igdb.com/v4/release_dates", headers=hdr, data=q, timeout=30)
+        r.raise_for_status()
+        games = {}
+        for rd in r.json():
+            g = rd.get("game") or {}
+            if not g.get("name"):
+                continue
+            e = games.setdefault(g["id"], {"name": g["name"], "date": rd["date"], "platforms": set(), "hypes": g.get("hypes", 0),
+                                          "cover": f"https://images.igdb.com/igdb/image/upload/t_cover_big/{g['cover']['image_id']}.jpg" if g.get("cover") else None,
+                                          "url": f"https://www.igdb.com/games/{g.get('slug')}" if g.get("slug") else None,
+                                          "genres": [x["name"] for x in g.get("genres", [])][:3]})
+            e["date"] = min(e["date"], rd["date"])
+            e["platforms"].add("PS5" if rd.get("platform") == 167 else "PC")
+        ids = list(games)[:150]
+        if ids:
+            t = requests.post("https://api.igdb.com/v4/game_time_to_beats", headers=hdr,
+                              data=f"fields game_id,normally,hastily,completely; where game_id = ({','.join(map(str, ids))}); limit 200;", timeout=30)
+            if t.ok:
+                for x in t.json():
+                    if x.get("game_id") in games and x.get("normally"):
+                        games[x["game_id"]]["ttb"] = round(x["normally"] / 3600)
+        out = [dict(v, id=k, platforms=sorted(v["platforms"])) for k, v in games.items() if v["hypes"] >= 5]
+        out.sort(key=lambda x: x["date"])
+        path.write_text(json.dumps({"updated": now, "games": out}, ensure_ascii=False), "utf-8")
+        return len(out)
+    except Exception as exc:
+        igdb.error = f"igdb sorties: {exc}"[:200]
+        return None
+
+
+# ---------- V3 : catalogue PC Game Pass ----------
+
+def gamepass_catalog(path, now):
+    """Liste des jeux du PC Game Pass (catalogue public de Microsoft), rafraîchie une fois par jour."""
+    try:
+        if path.exists() and now - json.loads(path.read_text("utf-8")).get("updated", 0) < 86400:
+            return None
+    except Exception:
+        pass
+    try:
+        r = requests.get("https://catalog.gamepass.com/sigls/v2",
+                         params={"id": "fdd9e2a7-0fee-49f6-ad69-4354098401ff", "language": "fr-fr", "market": "FR"},
+                         headers={"User-Agent": UA}, timeout=30)
+        r.raise_for_status()
+        ids = [x["id"] for x in r.json() if x.get("id")]
+        titles = []
+        for i in range(0, len(ids), 20):
+            d = requests.get("https://displaycatalog.mp.microsoft.com/v7.0/products",
+                             params={"bigIds": ",".join(ids[i:i + 20]), "market": "FR", "languages": "fr-fr"},
+                             headers={"User-Agent": UA}, timeout=30)
+            d.raise_for_status()
+            for p in d.json().get("Products", []):
+                lp = (p.get("LocalizedProperties") or [{}])[0]
+                if lp.get("ProductTitle"):
+                    titles.append(lp["ProductTitle"])
+            time.sleep(0.3)
+        if titles:
+            path.write_text(json.dumps({"updated": now, "titles": sorted(set(titles))}, ensure_ascii=False), "utf-8")
+        return len(titles)
+    except Exception as exc:
+        return f"erreur : {exc}"[:160]
