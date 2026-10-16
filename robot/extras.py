@@ -89,6 +89,16 @@ def rumor_status(members):
 
 # ---------- illustrations IGDB (facultatif, compte Twitch développeur gratuit) ----------
 
+GENERIC = {"leak", "leaks", "footage", "report", "trailer", "update", "gameplay", "review", "rumor", "rumour", "insider",
+           "sources", "new", "remake", "remaster", "sequel", "dlc", "beta", "demo", "patch", "season", "showcase", "direct",
+           "deal", "deals", "sale", "free", "games", "game", "video", "breaking", "exclusive", "official", "hands-on", "preview"}
+
+
+def generic_name(name):
+    n = (name or "").lower().strip()
+    return len(n) < 4 or n in GENERIC or all(w in GENERIC for w in n.split())
+
+
 class Igdb:
     def __init__(self):
         self.cid = os.environ.get("TWITCH_CLIENT_ID", "").strip()
@@ -114,7 +124,7 @@ class Igdb:
         stop = {"The", "A", "An", "New", "PS5", "PC", "Xbox", "Nintendo", "Switch", "Sony", "PlayStation", "Rumor", "Report", "Leak", "Insider"}
         for m in re.finditer(r"((?:[A-Z][\w'’:-]*|\d+)(?:\s+(?:[A-Z][\w'’:-]*|\d+|of|the|and))*)", title):
             c = m.group(1).strip(" :")
-            if len(c) > 3 and c.split()[0] not in stop:
+            if len(c) > 3 and c.split()[0] not in stop and not generic_name(c):
                 out.append(c)
         seen, res = set(), []
         for c in sorted(out, key=len, reverse=True):
@@ -137,7 +147,7 @@ class Igdb:
                 low = it["title_orig"].lower()
                 for g in r.json():
                     name = g.get("name", "")
-                    if name and all(w in low for w in name.lower().split()[:3]):
+                    if name and not generic_name(name) and all(w in low for w in name.lower().split()[:3]):
                         shots = [s["image_id"] for s in (g.get("screenshots") or []) + (g.get("artworks") or [])][:6]
                         it["game"] = name
                         if g.get("cover"):

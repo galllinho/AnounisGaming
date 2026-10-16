@@ -504,6 +504,9 @@ def main():
         elif "article" in head:
             del head["article"]
         wants_art = head["rumor"] or n < 12
+        if head.get("game") and extras.generic_name(head["game"]):
+            for k in ("game", "gallery", "cover", "trailer"):
+                head.pop(k, None)
         if wants_art and igdb.ok and not head.get("igdb_done") and not args.input:
             head["igdb_done"] = True
             head.pop("igdb_tried", None)
