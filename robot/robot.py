@@ -21,6 +21,8 @@ from pathlib import Path
 import feedparser
 import requests
 
+import extras
+
 ROOT = Path(__file__).resolve().parent
 UA = "Mozilla/5.0 (Linux; Android 14) AnounisGaming/1.0 (+usage personnel)"
 KEEP_HOURS = 96          # durée de conservation des infos
@@ -33,7 +35,8 @@ VOICES = ["fr-FR-VivienneMultilingualNeural", "fr-FR-DeniseNeural"]
 RUMOR_WORDS = [
     "leak", "leaked", "leaks", "rumor", "rumour", "rumored", "rumoured", "insider",
     "reportedly", "allegedly", "datamine", "datamined", "rumeur", "fuite", "leaké",
-    "リーク", "噂", "rumors", "rumours",
+    "リーク", "噂", "rumors", "rumours", "hearing that", "sources say", "i'm told", "i am told",
+    "according to sources", "selon nos informations", "selon des sources",
 ]
 PC_WORDS = ["pc", "steam", "epic games store", "gog", "windows", "steam deck"]
 PS5_WORDS = ["ps5", "playstation 5", "playstation", "ps plus", "psvr2", "ps5 pro", "state of play"]
@@ -109,6 +112,9 @@ def tags_for(text):
 def fetch_source(src):
     """Retourne (liste d'entrées brutes, statut)."""
     try:
+        if src["kind"] == "bluesky":
+            out = extras.fetch_bluesky(src, item_id, shorten)[: src.get("max", MAX_PER_SOURCE)]
+            return out, {"ok": True, "count": len(out)}
         r = requests.get(src["url"], headers={"User-Agent": UA}, timeout=25)
         if r.status_code in (403, 429) and "www.reddit.com" in src["url"]:
             time.sleep(6)
@@ -291,7 +297,8 @@ def words(text):
 
 def group_items(items):
     """Regroupe les infos qui parlent de la même chose (sur 48 h)."""
-    prio = {"officiel": 0, "site": 1, "video": 2, "reddit": 3}
+    prio = {"officiel": 0, "site": 1, "video": 2, "bluesky": 3, "reddit": 4}
+    result = []
     items.sort(key=lambda x: x["published"])
     sets = [words(it["title"]) | words(it["title_orig"]) for it in items]
     groups = []  # [indice canonique, ensemble de mots, membres]
@@ -327,6 +334,8 @@ def group_items(items):
         head["platforms"] = sorted({p for k in members for p in items[k]["platforms"]})
         for k in members[1:]:
             items[k]["group"] = head["id"]
+        result.append((head, [items[k] for k in members]))
+    return result
 
 
 # ---------- audio ----------
@@ -452,11 +461,49 @@ def main():
     for it in items:
         plats, rumor = tags_for(f"{it['title_orig']} {it['summary_orig']} {it['source']}")
         it["platforms"], it["rumor"] = plats, rumor or it["source"] == "r/GamingLeaksAndRumours"
-    group_items(items)
+    groups = group_items(items)
+
+    # fiabilité, articles de rumeurs, illustrations
+    table = extras.source_reliability(sources)
+    ia = {"ia_left": 25, "ia_used": 0, "error": None}
+    igdb = extras.Igdb()
+    recent = sorted(groups, key=lambda g: -g[0]["published"])
+    for n, (head, members) in enumerate(recent):
+        head["reliability"] = extras.rate_item(head, members, table)
+        if head["rumor"] or (head.get("article") and head["article"].get("status") == "rumeur"):
+            extras.write_rumor(head, members, table, ia)
+            if head["article"]["status"] == "confirme":
+                head["rumor"] = False
+        elif "article" in head:
+            del head["article"]
+        wants_art = head["rumor"] or n < 12
+        if wants_art and not head.get("igdb_tried") and not args.input:
+            head["igdb_tried"] = True
+            igdb.illustrate(head)
 
     made = 0
     if not args.no_audio:
         made = make_audio(items, out_dir)
+
+    # brief du matin
+    brief_path = out_dir / "brief.json"
+    old_brief = None
+    if brief_path.exists():
+        try:
+            old_brief = json.loads(brief_path.read_text("utf-8"))
+        except Exception:
+            old_brief = None
+    brief, is_new = extras.build_brief(items, old_brief)
+    if brief:
+        mp3 = out_dir / "brief.mp3"
+        if (is_new or not brief.get("audio")) and not args.no_audio:
+            try:
+                asyncio.run(_speak(brief["text"], mp3))
+                brief["audio"] = True
+            except Exception as exc:
+                log("Audio du brief impossible :", exc)
+                brief["audio"] = False
+        brief_path.write_text(json.dumps(brief, ensure_ascii=False), "utf-8")
 
     items.sort(key=lambda x: -x["published"])
     data = {
@@ -472,6 +519,10 @@ def main():
         "translation": tr.used,
         "translation_error": tr.last_error,
         "translation_errors": tr.errors,
+        "rumors_ai": ia["ia_used"],
+        "extras_errors": [e for e in (ia["error"], igdb.error) if e],
+        "igdb": igdb.ok,
+        "brief": brief.get("date") if brief else None,
         "audio_new": made,
     }, ensure_ascii=False, indent=1), "utf-8")
     heads = sum(1 for it in items if not it.get("group"))

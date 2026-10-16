@@ -1,5 +1,5 @@
 {
-  "_aide": "Liste des sources lues par le robot. kind : site, officiel, reddit, video. lang : langue d'origine (auto si mélangée). Ajoute ou retire une ligne, le robot s'adapte au prochain passage. Reddit est lu directement par l'appli sur le téléphone (Reddit refuse les serveurs GitHub).",
+  "_aide": "Liste des sources lues par le robot. kind : site, officiel, video, bluesky (url = identifiant Bluesky). reliability : fiabilité de 1 à 5 utilisée pour les rumeurs. Ajoute ou retire une ligne, le robot s'adapte au prochain passage. Reddit est lu directement par l'appli sur le téléphone (Reddit refuse les serveurs GitHub).",
   "sources": [
     {
       "name": "IGN",
@@ -77,7 +77,8 @@
       "name": "PlayStation Blog",
       "url": "https://blog.playstation.com/feed/",
       "kind": "officiel",
-      "lang": "en"
+      "lang": "en",
+      "reliability": 5
     },
     {
       "name": "PlayStation (YouTube)",
@@ -90,6 +91,34 @@
       "url": "https://www.youtube.com/feeds/videos.xml?user=IGNentertainment",
       "kind": "video",
       "lang": "en"
+    },
+    {
+      "name": "Jason Schreier",
+      "url": "jasonschreier.bsky.social",
+      "kind": "bluesky",
+      "lang": "en",
+      "reliability": 5
+    },
+    {
+      "name": "Stephen Totilo",
+      "url": "stephentotilo.bsky.social",
+      "kind": "bluesky",
+      "lang": "en",
+      "reliability": 5
+    },
+    {
+      "name": "Push Square",
+      "url": "pushsquare.com",
+      "kind": "bluesky",
+      "lang": "en",
+      "reliability": 4
+    },
+    {
+      "name": "Jeff Gerstmann",
+      "url": "jeffgerstmann.com",
+      "kind": "bluesky",
+      "lang": "en",
+      "reliability": 4
     }
   ]
 }

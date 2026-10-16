@@ -18,7 +18,7 @@ concurrency:
 jobs:
   robot:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -44,6 +44,9 @@ jobs:
       - name: Lire, traduire, regrouper, enregistrer l'audio
         env:
           DEEPL_KEY: ${{ secrets.DEEPL_KEY }}
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+          TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
         run: python robot/robot.py --out data-out
 
       - name: Publier le fil sur la branche data
