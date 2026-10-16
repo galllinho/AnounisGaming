@@ -166,7 +166,7 @@ def gemini_call(payload, timeout=90):
     last = None
     for model in GEMINI_MODELS:
         r = requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                          params={"key": key}, json=payload, timeout=timeout)
+                          headers={"x-goog-api-key": key, "Content-Type": "application/json"}, json=payload, timeout=timeout)
         if r.status_code == 404:
             last = f"modèle {model} introuvable"
             continue
