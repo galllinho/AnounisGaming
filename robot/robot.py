@@ -110,6 +110,9 @@ def fetch_source(src):
     """Retourne (liste d'entrées brutes, statut)."""
     try:
         r = requests.get(src["url"], headers={"User-Agent": UA}, timeout=25)
+        if r.status_code in (403, 429) and "www.reddit.com" in src["url"]:
+            time.sleep(6)
+            r = requests.get(src["url"].replace("www.reddit.com", "old.reddit.com"), headers={"User-Agent": UA}, timeout=25)
         r.raise_for_status()
         feed = feedparser.parse(r.content)
         out = []
@@ -170,33 +173,46 @@ class Translator:
         return [t["text"] for t in r.json()["translations"]]
 
     def _gtx(self, text):
-        r = requests.get(
-            "https://translate.googleapis.com/translate_a/single",
-            params={"client": "gtx", "sl": "auto", "tl": "fr", "dt": "t", "q": text},
-            headers={"User-Agent": UA}, timeout=20,
-        )
-        r.raise_for_status()
-        out = "".join(seg[0] for seg in r.json()[0] if seg and seg[0])
-        if not out:
-            raise RuntimeError("réponse vide")
-        return out
+        for attempt in range(3):
+            r = requests.post(
+                "https://translate.googleapis.com/translate_a/single",
+                params={"client": "gtx", "sl": "auto", "tl": "fr", "dt": "t"},
+                data={"q": text}, headers={"User-Agent": UA}, timeout=30,
+            )
+            if r.status_code == 429:
+                time.sleep(4 * (attempt + 1))
+                continue
+            r.raise_for_status()
+            out = "".join(seg[0] for seg in r.json()[0] if seg and seg[0])
+            if not out:
+                raise RuntimeError("réponse vide")
+            return out
+        raise RuntimeError("trop de demandes (429)")
 
     def _google(self, texts):
-        from deep_translator import GoogleTranslator
-        def one(t):
+        """Traduit par paquets d'environ 3 000 caractères, une demande toutes les 0,4 s."""
+        out = list(texts)
+        fails = 0
+        i = 0
+        while i < len(texts):
+            j, size = i, 0
+            while j < len(texts) and (j == i or size + len(texts[j]) < 3000):
+                size += len(texts[j]) + 1
+                j += 1
+            chunk = [t.replace("\n", " ") for t in texts[i:j]]
             try:
-                return self._gtx(t), False
+                res = self._gtx("\n".join(chunk)).split("\n")
+                if len(res) != len(chunk):
+                    res = []
+                    for t in chunk:
+                        res.append(self._gtx(t))
+                        time.sleep(0.3)
+                out[i:j] = [r.strip() or t for r, t in zip(res, chunk)]
             except Exception as exc:
-                self.last_error = f"gtx: {exc}"
-            try:
-                return GoogleTranslator(source="auto", target="fr").translate(t) or t, False
-            except Exception as exc:
-                self.last_error = f"deep-translator: {exc}"
-                return t, True
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            res = list(pool.map(one, texts))
-        out = [r[0] for r in res]
-        fails = sum(1 for r in res if r[1])
+                self.last_error = f"google: {exc}"
+                fails += j - i
+            time.sleep(0.4)
+            i = j
         if fails == len(texts):
             raise RuntimeError(f"Google Traduction ne répond pas ({self.last_error})")
         return out
