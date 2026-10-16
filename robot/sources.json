@@ -1,5 +1,5 @@
 {
-  "_aide": "Liste des sources lues par le robot. kind : site, officiel, reddit, video. lang : langue d'origine (auto si mélangée). Ajoute ou retire une ligne, le robot s'adapte au prochain passage.",
+  "_aide": "Liste des sources lues par le robot. kind : site, officiel, reddit, video. lang : langue d'origine (auto si mélangée). Ajoute ou retire une ligne, le robot s'adapte au prochain passage. Reddit est lu directement par l'appli sur le téléphone (Reddit refuse les serveurs GitHub).",
   "sources": [
     {
       "name": "IGN",
@@ -78,13 +78,6 @@
       "url": "https://blog.playstation.com/feed/",
       "kind": "officiel",
       "lang": "en"
-    },
-    {
-      "name": "Reddit",
-      "url": "https://www.reddit.com/r/Games+PS5+pcgaming+GamingLeaksAndRumours/top/.rss?t=day&limit=50",
-      "kind": "reddit",
-      "lang": "en",
-      "max": 50
     },
     {
       "name": "PlayStation (YouTube)",

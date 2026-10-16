@@ -149,6 +149,152 @@ p{margin:0}
 .skel{background:linear-gradient(90deg,var(--surface) 0,var(--surface2) 50%,var(--surface) 100%);background-size:200% 100%;animation:sh 1.2s infinite;border-radius:var(--r)}
 @keyframes sh{to{background-position:-200% 0}}
 .toast{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;z-index:60;max-width:90vw;text-align:center}
+/* ================= SKINS ================= */
+@font-face{font-family:"Press Start 2P";font-weight:400;src:url(fonts/press-start-2p.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"Rajdhani";font-weight:600;src:url(fonts/rajdhani-600.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"Rajdhani";font-weight:700;src:url(fonts/rajdhani-700.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"Exo 2";font-weight:100 900;src:url(fonts/exo-2.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"Sora";font-weight:100 800;src:url(fonts/sora.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"Manrope";font-weight:200 800;src:url(fonts/manrope.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"Chakra Petch";font-weight:500;src:url(fonts/chakra-petch-500.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"Chakra Petch";font-weight:600;src:url(fonts/chakra-petch-600.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"Chakra Petch";font-weight:700;src:url(fonts/chakra-petch-700.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"Barlow";font-weight:400;src:url(fonts/barlow-400.woff2) format("woff2");font-display:swap}
+@font-face{font-family:"Barlow";font-weight:600;src:url(fonts/barlow-600.woff2) format("woff2");font-display:swap}
+:root{--label:var(--display)}
+.chip,.badge,.nav button,.section-t{font-family:var(--label)}
+.skinx{display:none}
+
+/* Choix de skin dans les réglages */
+.skins{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.skin-card{border-radius:14px;border:2px solid var(--line);overflow:hidden;text-align:left;background:var(--surface)}
+.skin-card[aria-pressed="true"]{border-color:var(--accent)}
+.skin-card .sw{height:64px;display:flex;align-items:flex-end;padding:8px;gap:5px}
+.skin-card .sw i{width:16px;height:16px;border-radius:4px;display:block}
+.skin-card .nm{padding:8px 10px;font-weight:700;font-size:14px}
+
+/* ---------- 1. NÉON ARCADE ---------- */
+body[data-skin="neon"]{
+  --bg:#07070F; --surface:#0F0E1E; --surface2:#1A1834; --line:#2B2852;
+  --fg:#ECEBFF; --muted:#9C98C9; --faint:#6E6A9C;
+  --accent:#22E4FF; --accent-soft:rgba(34,228,255,.12); --accent2:#FF2BD6;
+  --rumor:#FFE14D; --rumor-soft:rgba(255,225,77,.08);
+  --ps5:#6FA8FF; --ps5-soft:transparent; --pc:#22E4FF; --pc-soft:transparent; --ok:#5CFF9D; --ok-soft:transparent;
+  --display:"Rajdhani",var(--body); --body:"Exo 2",system-ui,sans-serif; --label:"Press Start 2P",monospace; --r:14px;
+}
+body[data-skin="neon"]::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;background-image:repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0,rgba(255,255,255,.025) 1px,transparent 1px,transparent 4px)}
+body[data-skin="neon"] .brand{font-family:var(--label);font-size:14px;letter-spacing:1px;gap:6px}
+body[data-skin="neon"] .brand i{display:none}
+body[data-skin="neon"] .brand .b1{color:var(--accent);text-shadow:0 0 10px rgba(34,228,255,.7)}
+body[data-skin="neon"] .brand .b2{color:var(--accent2);text-shadow:0 0 10px rgba(255,43,214,.7)}
+body[data-skin="neon"] .updated{font-family:var(--label);font-size:8px;text-transform:uppercase;margin-top:6px;display:flex;align-items:center;gap:6px}
+body[data-skin="neon"] .updated::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent2);box-shadow:0 0 8px var(--accent2)}
+body[data-skin="neon"] .iconbtn{border:1.5px solid var(--accent);color:var(--accent);background:var(--accent-soft);box-shadow:0 0 12px rgba(34,228,255,.35);border-radius:10px}
+body[data-skin="neon"] .iconbtn:nth-child(2n){border-color:var(--accent2);color:var(--accent2);background:rgba(255,43,214,.08);box-shadow:0 0 12px rgba(255,43,214,.35)}
+body[data-skin="neon"] .chip{font-size:9px;text-transform:uppercase;border-radius:8px;border-width:1.5px;padding:10px 13px;background:transparent;color:#C9C6F2}
+body[data-skin="neon"] .chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#07070F;box-shadow:0 0 14px rgba(34,228,255,.6)}
+body[data-skin="neon"] .card{border-width:1.5px}
+body[data-skin="neon"] .card.hero{border-color:var(--accent2);box-shadow:0 0 18px rgba(255,43,214,.35)}
+body[data-skin="neon"] .card.is-rumor{border-color:var(--rumor);background:var(--rumor-soft);box-shadow:0 0 12px rgba(255,225,77,.18)}
+body[data-skin="neon"] .hero h2{font-size:24px;line-height:1.08}
+body[data-skin="neon"] .item h3{font-family:var(--display);font-weight:700;font-size:17px;line-height:1.15}
+body[data-skin="neon"] .badge{font-size:8px;padding:6px 7px;border-radius:5px;border:1px solid currentColor;background:transparent}
+body[data-skin="neon"] .b-rumor{background:var(--rumor);color:#07070F;border-color:var(--rumor)}
+body[data-skin="neon"] .b-more{color:var(--muted)}
+body[data-skin="neon"] .flag{font-family:var(--label);font-size:7px}
+body[data-skin="neon"] .hero-tag{display:block;position:absolute;left:12px;top:12px;font-family:var(--label);font-size:8px;color:#07070F;background:var(--rumor);padding:6px 8px;border-radius:4px}
+body[data-skin="neon"] .play span{border:2px solid var(--accent);box-shadow:0 0 14px rgba(34,228,255,.6);background:rgba(7,7,15,.7)}
+body[data-skin="neon"] .play svg{fill:var(--accent)}
+body[data-skin="neon"] .nav button{font-size:8px;text-transform:uppercase;gap:7px}
+body[data-skin="neon"] .nav button[aria-current="page"]{color:var(--accent);text-shadow:0 0 8px rgba(34,228,255,.7)}
+body[data-skin="neon"] .btn.primary{background:var(--accent);border-color:var(--accent);color:#07070F;box-shadow:0 0 14px rgba(34,228,255,.5)}
+body[data-skin="neon"] .warn{border-color:var(--rumor);color:#FFF1A8}
+body[data-skin="neon"] .art h1{font-size:28px}
+
+/* ---------- 2. CONSOLE NOUVELLE GÉNÉRATION ---------- */
+body[data-skin="console"]{
+  --bg:#070B16; --surface:rgba(255,255,255,.06); --surface2:#1C2440; --line:rgba(255,255,255,.14);
+  --fg:#F2F5FB; --muted:rgba(242,245,251,.68); --faint:rgba(242,245,251,.45);
+  --accent:#FFFFFF; --accent-soft:rgba(255,255,255,.14);
+  --rumor:#F5B43C; --rumor-soft:#F5B43C; --ps5:#5B8CFF; --ps5-soft:#5B8CFF; --pc:#2FCFA9; --pc-soft:#2FCFA9; --ok:#3FD07A; --ok-soft:#3FD07A;
+  --display:"Sora",system-ui,sans-serif; --body:"Manrope",system-ui,sans-serif; --label:"Manrope",system-ui,sans-serif; --r:18px;
+}
+body[data-skin="console"] .badge{color:#0B1020;border-radius:999px;font-weight:800;letter-spacing:.06em}
+body[data-skin="console"] .b-ps5,body[data-skin="console"] .b-more{color:#fff}
+body[data-skin="console"] .b-more{background:rgba(255,255,255,.16)}
+body[data-skin="console"] .brand{font-size:17px;font-weight:600;gap:10px}
+body[data-skin="console"] .brand i{animation:none;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.14);box-shadow:none;border:1px solid rgba(255,255,255,.25);display:grid;place-items:center;font-style:normal;font-size:13px;font-weight:700}
+body[data-skin="console"] .brand i::after{content:"AG"}
+body[data-skin="console"] .updated{margin-left:46px}
+body[data-skin="console"] .iconbtn{border-radius:50%;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.22)}
+body[data-skin="console"] .chip{border-radius:999px;background:rgba(255,255,255,.06);color:#DCE3F2}
+body[data-skin="console"] .chip[aria-pressed="true"]{background:#fff;color:#070B16;border-color:#fff}
+body[data-skin="console"] .search{border-radius:999px;background:rgba(255,255,255,.06)}
+body[data-skin="console"] .card{backdrop-filter:blur(10px)}
+body[data-skin="console"] .ambient{display:block;position:fixed;left:-60px;right:-60px;top:-60px;height:520px;background-size:cover;background-position:center;filter:blur(38px) saturate(1.3);opacity:.55;z-index:-1}
+body[data-skin="console"] .ambient::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,11,22,.1) 0%,#070B16 92%)}
+body[data-skin="console"] .chero{display:flex;flex-direction:column;gap:10px;padding-top:56px;text-align:left}
+body[data-skin="console"] .chero .tag{align-self:flex-start;font-size:11px;font-weight:700;letter-spacing:1.5px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25)}
+body[data-skin="console"] .chero h2{font-size:27px;line-height:1.15;letter-spacing:-.5px}
+body[data-skin="console"] .chero .btns .btn{border-radius:999px;height:48px}
+body[data-skin="console"] .chero .btns .btn.primary{background:#fff;color:#070B16;border-color:#fff}
+body[data-skin="console"] .rail-t{display:block;font-family:var(--display);font-weight:600;font-size:16px}
+body[data-skin="console"] .rail{display:flex;gap:12px;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px;scroll-snap-type:x mandatory}
+body[data-skin="console"] .rail::-webkit-scrollbar{display:none}
+body[data-skin="console"] .tile{flex:none;width:156px;display:flex;flex-direction:column;gap:8px;text-align:left;scroll-snap-align:start}
+body[data-skin="console"] .tile .ph{height:196px;border-radius:16px;background:var(--surface2) center/cover no-repeat;position:relative;border:1px solid rgba(255,255,255,.12)}
+body[data-skin="console"] .tile .ph .badges{position:absolute;left:8px;top:8px}
+body[data-skin="console"] .tile b{font-size:14px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+body[data-skin="console"] .tile.read{opacity:.55}
+body[data-skin="console"] .nav{left:16px;right:16px;bottom:calc(12px + env(safe-area-inset-bottom,0px));border-radius:22px;border:1px solid rgba(255,255,255,.12);background:rgba(28,34,54,.88);padding-bottom:0}
+body[data-skin="console"] .nav button[aria-current="page"] svg{color:#fff}
+body[data-skin="console"] .player{bottom:calc(90px + env(safe-area-inset-bottom,0px))}
+body[data-skin="console"] .btn{border-radius:999px}
+body[data-skin="console"] .btn.primary{background:#fff;color:#070B16;border-color:#fff}
+body[data-skin="console"] .sheet{background:#070B16}
+
+/* ---------- 3. HUD DE JEU ---------- */
+body[data-skin="hud"]{
+  --bg:#0A0D10; --surface:#12171C; --surface2:#1B2229; --line:#2A333B;
+  --fg:#E6ECEF; --muted:#93A1AC; --faint:#66727C;
+  --accent:#FF8A1F; --accent-soft:rgba(255,138,31,.12); --xp:#B6FF3B;
+  --rumor:#FFD23F; --rumor-soft:transparent; --ps5:#6FA8FF; --ps5-soft:transparent; --pc:#4FC3FF; --pc-soft:transparent; --ok:#B6FF3B; --ok-soft:transparent;
+  --display:"Chakra Petch",system-ui,sans-serif; --body:"Barlow",system-ui,sans-serif; --label:"Chakra Petch",system-ui,sans-serif; --r:0px;
+  --cut:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px));
+}
+body[data-skin="hud"]::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;background-image:linear-gradient(rgba(255,138,31,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,138,31,.05) 1px,transparent 1px);background-size:26px 26px}
+body[data-skin="hud"] .card,body[data-skin="hud"] .box,body[data-skin="hud"] .search,body[data-skin="hud"] .btn,body[data-skin="hud"] .iconbtn,body[data-skin="hud"] .warn{clip-path:var(--cut);border-radius:0}
+body[data-skin="hud"] .card.hero{border-color:var(--accent)}
+body[data-skin="hud"] .hero-tag{display:block;position:absolute;left:0;top:0;padding:6px 12px;background:var(--accent);color:#0A0D10;font-family:var(--label);font-weight:700;font-size:12px;letter-spacing:1.5px}
+body[data-skin="hud"] .hero .media::after{content:"";position:absolute;right:10px;top:10px;width:18px;height:18px;border-top:2px solid var(--accent);border-right:2px solid var(--accent)}
+body[data-skin="hud"] .chip{border-radius:0;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%);text-transform:uppercase;letter-spacing:1px;padding:9px 16px;color:#C4CED6}
+body[data-skin="hud"] .chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#0A0D10}
+body[data-skin="hud"] .badge{border-radius:0;border:1px solid currentColor;letter-spacing:1px}
+body[data-skin="hud"] .b-rumor{border:0;padding-left:0}
+body[data-skin="hud"] .b-rumor::before{content:"◆ "}
+body[data-skin="hud"] .item h3{font-family:var(--display);font-weight:600;font-size:16px}
+body[data-skin="hud"] .card.is-rumor{border-left:3px solid var(--rumor)}
+body[data-skin="hud"] .play span{border-radius:0;border:2px solid var(--accent);background:rgba(10,13,16,.7)}
+body[data-skin="hud"] .play svg{fill:var(--accent)}
+body[data-skin="hud"] .player-card{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--surface);border:1px solid var(--line);clip-path:var(--cut)}
+body[data-skin="hud"] .player-card .hex{width:44px;height:44px;flex:none;background:var(--accent);color:#0A0D10;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:16px;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)}
+body[data-skin="hud"] .player-card .nm{display:flex;justify-content:space-between;font-family:var(--display);font-weight:600;font-size:14px;letter-spacing:.5px}
+body[data-skin="hud"] .player-card .lv{color:var(--xp)}
+body[data-skin="hud"] .xpbar{height:6px;background:#222B33;margin:5px 0}
+body[data-skin="hud"] .xpbar i{display:block;height:100%;background:var(--xp)}
+body[data-skin="hud"] .nav-in{gap:8px;padding:8px 10px}
+body[data-skin="hud"] .nav button{flex-direction:row;justify-content:center;gap:8px;height:50px;padding:0;background:#161C22;clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%);text-transform:uppercase;letter-spacing:1px;font-weight:700;color:#C4CED6}
+body[data-skin="hud"] .nav button svg{display:none}
+body[data-skin="hud"] .nav button[aria-current="page"]{background:var(--accent);color:#0A0D10}
+body[data-skin="hud"] .nav button .slot{display:inline;opacity:.6}
+body[data-skin="hud"] .btn.primary{color:#0A0D10}
+body[data-skin="hud"] .section-t{color:var(--accent)}
+
+/* éléments propres à un skin, masqués ailleurs */
+.hero-tag,.ambient,.rail-t,.player-card,.nav .slot{display:none}
+body[data-skin="hud"] .player-card{display:flex}
+body[data-skin="hud"] .top .brand{visibility:hidden}
+input[type=range]{accent-color:var(--accent)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 <div id="app"></div>

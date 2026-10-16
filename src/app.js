@@ -25,11 +25,44 @@ const S = {
   status: null,
   read: new Set(store.get("read", [])),
   hidden: new Set(store.get("hiddenSources", [])),
-  settings: Object.assign({ token: "", itad: "", rate: 1, voice: "humaine" }, store.get("settings", {})),
+  settings: Object.assign({ token: "", itad: "", rate: 1, voice: "humaine", skin: "neon" }, store.get("settings", {})),
+  today: store.get("today", { d: "", n: 0 }),
+  reddit: store.get("reddit", null),
+  redditErr: null,
   price: { q: "", results: null, game: null, rows: null, loading: false, error: null, low: null }
 };
 const saveSettings = () => store.set("settings", S.settings);
 const saveRead = () => store.set("read", [...S.read].slice(-1500));
+const dayKey = () => new Date().toISOString().slice(0, 10);
+function markRead(id) {
+  if (S.read.has(id)) return;
+  S.read.add(id); saveRead();
+  if (S.today.d !== dayKey()) S.today = { d: dayKey(), n: 0 };
+  S.today.n++; store.set("today", S.today);
+}
+
+/* ---------- skins ---------- */
+const SKINS = [
+  { id: "neon", name: "Néon arcade", colors: ["#07070F", "#22E4FF", "#FF2BD6", "#FFE14D"], theme: "#07070F" },
+  { id: "console", name: "Console", colors: ["#0D1530", "#5B8CFF", "#FFFFFF", "#F5B43C"], theme: "#070B16" },
+  { id: "hud", name: "HUD de jeu", colors: ["#0A0D10", "#FF8A1F", "#B6FF3B", "#FFD23F"], theme: "#0A0D10" },
+  { id: "classique", name: "Classique", colors: ["#0B0D12", "#FF4655", "#4C8DFF", "#F5A524"], theme: "#0B0D12" }
+];
+const skin = () => S.settings.skin;
+function applySkin() {
+  const sk = SKINS.find(k => k.id === skin()) || SKINS[0];
+  S.settings.skin = sk.id;
+  document.body.dataset.skin = sk.id;
+  const m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute("content", sk.theme);
+}
+function nextSkin() {
+  const i = SKINS.findIndex(k => k.id === skin());
+  S.settings.skin = SKINS[(i + 1) % SKINS.length].id; saveSettings(); applySkin();
+  toast("Skin : " + SKINS.find(k => k.id === skin()).name);
+  if (Plug.Haptics) Plug.Haptics.impact({ style: "LIGHT" }).catch(() => {});
+  render();
+}
 
 /* ---------- utilitaires ---------- */
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -46,6 +79,7 @@ const ICON = {
   news: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9h10M7 13h10M7 17h6"/></svg>',
   tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>',
   gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  palette: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.9 1.2-1.8-.5-1.1.2-2.2 1.4-2.2H17a4 4 0 0 0 4-4c0-5.5-4-10-9-10z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg>',
   key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L21 2M16 7l3 3M18 5l2 2"/></svg>'
 };
 const LANG = { en: "EN", ja: "JP", fr: "FR", auto: "" };
@@ -92,15 +126,82 @@ async function loadFeed(manual) {
     store.set("feed", S.feed);
     gh("status.json").then(s => { S.status = s; if (S.tab === "reglages") render(); }).catch(() => {});
     if (manual) toast("Fil à jour");
+    loadReddit(manual);
   } catch (e) {
     S.error = e.message === "token" ? null : e.message;
   }
   S.loading = false; render();
 }
 
+/* ---------- Reddit, lu directement depuis le téléphone ---------- */
+const REDDIT = "https://www.reddit.com/r/Games+PS5+pcgaming+GamingLeaksAndRumours/top.json?t=day&limit=40&raw_json=1";
+const RUMOR_WORDS = ["leak", "leaked", "rumor", "rumour", "insider", "reportedly", "allegedly", "datamine", "rumeur", "fuite"];
+const PS5_RE = /\b(ps5|playstation|state of play|ps plus|psvr2)\b/i, PC_RE = /\b(pc|steam|epic games store|gog|steam deck)\b/i;
+function tagItem(it) {
+  const t = `${it.title_orig} ${it.summary_orig || ""}`;
+  it.platforms = [PS5_RE.test(t) && "PS5", PC_RE.test(t) && "PC"].filter(Boolean);
+  it.rumor = it.source === "r/GamingLeaksAndRumours" || RUMOR_WORDS.some(w => t.toLowerCase().includes(w));
+  return it;
+}
+async function translateOnPhone(texts) {
+  const out = [...texts];
+  let i = 0;
+  while (i < texts.length) {
+    let j = i, size = 0;
+    while (j < texts.length && (j === i || size + texts[j].length < 1400)) { size += texts[j].length + 1; j++; }
+    const chunk = texts.slice(i, j).map(t => t.replace(/\n/g, " "));
+    try {
+      const d = await http("GET", "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=fr&dt=t&q=" + encodeURIComponent(chunk.join("\n")));
+      const res = d[0].map(seg => seg[0] || "").join("").split("\n");
+      if (res.length === chunk.length) res.forEach((r, k) => { out[i + k] = r.trim() || chunk[k]; });
+    } catch {}
+    i = j;
+  }
+  return out;
+}
+async function loadReddit(force) {
+  if (!force && S.reddit && Date.now() / 1000 - S.reddit.at < 1200) return;
+  try {
+    const d = await http("GET", REDDIT);
+    const prev = new Map(((S.reddit && S.reddit.items) || []).map(it => [it.id, it]));
+    const items = [];
+    for (const c of (d.data && d.data.children) || []) {
+      const p = c.data;
+      if (!p || p.stickied || p.over_18) continue;
+      const id = "rd" + p.id;
+      if (prev.has(id)) { const o = prev.get(id); o.score = p.score; items.push(o); continue; }
+      const img = p.preview && p.preview.images && p.preview.images[0] && p.preview.images[0].source && p.preview.images[0].source.url;
+      const yt = (p.url || "").match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+      const body = (p.selftext || "").replace(/\s+/g, " ").trim();
+      items.push(tagItem({
+        id, url: "https://www.reddit.com" + p.permalink, source: "r/" + p.subreddit, kind: "reddit", lang: "en",
+        published: p.created_utc, title_orig: p.title, summary_orig: body.length > 320 ? body.slice(0, 320).replace(/\s\S*$/, "") + "…" : body,
+        image: img || (/^https?:/.test(p.thumbnail || "") ? p.thumbnail : null), video: yt ? yt[1] : null, score: p.score, fresh: true
+      }));
+    }
+    const fresh = items.filter(it => it.fresh);
+    if (fresh.length) {
+      const tr = await translateOnPhone(fresh.flatMap(it => [it.title_orig, it.summary_orig || ""]));
+      fresh.forEach((it, k) => { it.title = tr[2 * k]; it.summary = tr[2 * k + 1]; it.translated = it.title !== it.title_orig; delete it.fresh; });
+    }
+    S.reddit = { at: Math.floor(Date.now() / 1000), items };
+    S.redditErr = null;
+    store.set("reddit", S.reddit);
+  } catch (e) {
+    S.redditErr = e.message || "Reddit indisponible";
+  }
+  render();
+}
+
+function allItems() {
+  const base = S.feed ? S.feed.items.filter(it => !it.group) : [];
+  const rd = (S.reddit && S.reddit.items) || [];
+  return base.concat(rd).sort((a, b) => b.published - a.published);
+}
+
 function heads() {
-  if (!S.feed) return [];
-  let list = S.feed.items.filter(it => !it.group && !S.hidden.has(it.source));
+  if (!S.feed && !S.reddit) return [];
+  let list = allItems().filter(it => !S.hidden.has(it.source));
   const f = S.filter;
   if (f === "ps5") list = list.filter(it => (it.platforms || []).includes("PS5"));
   else if (f === "pc") list = list.filter(it => (it.platforms || []).includes("PC"));
@@ -116,7 +217,7 @@ function heads() {
 /* ---------- rendu ---------- */
 function badges(it) {
   const b = [];
-  if (it.rumor) b.push('<span class="badge b-rumor">Rumeur</span>');
+  if (it.rumor) b.push(`<span class="badge b-rumor">${skin() === "hud" ? "Intel non confirmé" : "Rumeur"}</span>`);
   if (it.kind === "officiel") b.push('<span class="badge b-off">Officiel</span>');
   for (const p of it.platforms || []) b.push(`<span class="badge ${p === "PS5" ? "b-ps5" : "b-pc"}">${p}</span>`);
   const n = (it.also || []).length;
@@ -129,10 +230,11 @@ function meta(it) {
 }
 const bg = url => url ? `style="background-image:url('${esc(url).replace(/'/g, "%27")}')"` : "";
 const playOverlay = it => it.video ? `<div class="play"><span>${ICON.play}</span></div>` : "";
+const HERO_TAG = { neon: "À la une", hud: "▶ Mission principale" };
 function card(it, hero) {
-  const read = S.read.has(it.id) ? " read" : "";
+  const read = (S.read.has(it.id) ? " read" : "") + (it.rumor ? " is-rumor" : "");
   if (hero) return `<button class="card hero${read}" data-open="${it.id}">
-      <div class="media" ${bg(it.image)}>${playOverlay(it)}</div>
+      <div class="media" ${bg(it.image)}>${HERO_TAG[skin()] ? `<span class="hero-tag">${HERO_TAG[skin()].toUpperCase()}</span>` : ""}${playOverlay(it)}</div>
       <div class="body">${meta(it)}<h2>${esc(it.title)}</h2>${badges(it)}</div></button>`;
   return `<button class="card${read}" data-open="${it.id}"><div class="item">
       <div class="txt">${meta(it)}<h3>${esc(it.title)}</h3>${badges(it)}</div>
@@ -140,21 +242,56 @@ function card(it, hero) {
 }
 
 const FILTERS = [["tout", "Tout"], ["ps5", "PS5"], ["pc", "PC"], ["rumeurs", "Rumeurs"], ["officiel", "Officiel"], ["videos", "Vidéos"], ["communaute", "Communauté"]];
+const filterLabel = (k, l) => skin() === "hud" && k === "rumeurs" ? "Intel" : l;
+
+function consoleHero(it) {
+  const tag = ["À la une", ...(it.platforms || [])].join(" · ").toUpperCase();
+  const n = (it.also || []).length;
+  return `<div class="ambient" ${bg(it.image)}></div>
+    <div class="chero"><span class="tag">${esc(tag)}</span><h2>${esc(it.title)}</h2>
+    <div class="small muted">${esc(it.source)}${n ? ` et ${n} autre${n > 1 ? "s" : ""} source${n > 1 ? "s" : ""}` : ""} · ${ago(it.published)}</div>
+    <div class="btns">${it.video ? `<button class="btn primary" data-open="${it.id}">${ICON.play.replace("<svg", '<svg width="16" height="16" fill="currentColor"')} Voir la vidéo</button>` : `<button class="btn primary" data-listen="${it.id}">${ICON.headphones} Écouter</button>`}
+    <button class="btn" data-open="${it.id}">Lire</button></div></div>`;
+}
+function tile(it) {
+  return `<button class="tile${S.read.has(it.id) ? " read" : ""}" data-open="${it.id}"><div class="ph" ${bg(it.image)}>${badges({ ...it, also: [] })}${playOverlay(it)}</div><b>${esc(it.title)}</b></button>`;
+}
+function playerCard(total) {
+  const today = S.today.d === dayKey() ? S.today.n : 0;
+  const goal = Math.max(10, Math.min(40, total));
+  const lvl = 1 + Math.floor(S.read.size / 25);
+  return `<div class="player-card"><div class="hex">AG</div><div class="grow">
+    <div class="nm"><span>ANOUNISGAMING</span><span class="lv">NIV. ${lvl}</span></div>
+    <div class="xpbar"><i style="width:${Math.min(100, Math.round(100 * today / goal))}%"></i></div>
+    <div class="tiny muted">${today} infos lues sur ${goal} aujourd'hui${S.feed ? " · màj " + ago(S.feed.updated) : ""}</div></div></div>`;
+}
 
 function viewFil() {
   if (!S.settings.token) return viewSetup();
   const list = heads();
-  const top = `<header class="top"><div><div class="brand"><i></i>AnounisGaming</div>
-      <div class="updated">${S.feed ? "Mis à jour " + ago(S.feed.updated) : "Chargement…"}</div></div>
-      <div class="row"><button class="iconbtn" data-act="listen-all" aria-label="Écouter le fil">${ICON.headphones}</button>
-      <button class="iconbtn${S.loading ? " spin" : ""}" data-act="refresh" aria-label="Actualiser">${ICON.refresh}</button></div></header>`;
-  const chips = `<div class="chips" role="toolbar">${FILTERS.map(([k, l]) => `<button class="chip" data-filter="${k}" aria-pressed="${S.filter === k}">${l}</button>`).join("")}</div>`;
+  const sk = skin();
+  const brand = sk === "neon" ? '<span class="b1">ANOUNIS</span><span class="b2">GAMING</span>' : "<i></i>AnounisGaming";
+  const upd = S.feed ? (sk === "neon" ? `Live · ${list.length} infos · màj ${ago(S.feed.updated)}` : "Mis à jour " + ago(S.feed.updated)) : "Chargement…";
+  const top = `<header class="top"><div><div class="brand">${brand}</div>
+      ${sk === "hud" ? "" : `<div class="updated">${upd}</div>`}</div>
+      <div class="row"><button class="iconbtn" data-act="skin" aria-label="Changer de skin">${ICON.palette}</button>
+      <button class="iconbtn" data-act="listen-all" aria-label="Écouter le fil">${ICON.headphones}</button>
+      <button class="iconbtn${S.loading ? " spin" : ""}" data-act="refresh" aria-label="Actualiser">${ICON.refresh}</button></div></header>
+      ${sk === "hud" ? playerCard(list.length) : ""}`;
+  const chips = `<div class="chips" role="toolbar">${FILTERS.map(([k, l]) => `<button class="chip" data-filter="${k}" aria-pressed="${S.filter === k}">${filterLabel(k, l)}</button>`).join("")}</div>`;
   const search = `<input class="search" type="search" placeholder="Chercher un jeu, un studio…" value="${esc(S.query)}" data-input="query" enterkeyhint="search">`;
   let body;
   if (S.error && !S.feed) body = `<div class="empty"><p class="err">${esc(S.error)}</p><button class="btn" data-act="refresh">Réessayer</button></div>`;
-  else if (!S.feed) body = `<div class="skel" style="aspect-ratio:16/12"></div><div class="skel" style="height:96px"></div><div class="skel" style="height:96px"></div>`;
+  else if (!S.feed && !S.reddit) body = `<div class="skel" style="aspect-ratio:16/12"></div><div class="skel" style="height:96px"></div><div class="skel" style="height:96px"></div>`;
   else if (!list.length) body = `<div class="empty">${ICON.news}<p class="muted">Rien ici pour l'instant avec ce filtre.</p></div>`;
-  else {
+  else if (sk === "console" && !S.query) {
+    const rail = list.slice(1, 9), rest = list.slice(9, S.shown);
+    const err = S.error && S.feed ? `<p class="small err">${esc(S.error)}</p>` : "";
+    return `<div class="stack">${top}${consoleHero(list[0])}${chips}${search}${err}
+      ${rail.length ? `<div class="rail-t">Les dernières infos</div><div class="rail">${rail.map(tile).join("")}</div>` : ""}
+      ${rest.map(it => card(it, false)).join("")}
+      ${list.length > S.shown ? `<button class="more" data-act="more">Voir plus (${list.length - S.shown})</button>` : ""}</div>`;
+  } else {
     const part = list.slice(0, S.shown);
     body = part.map((it, i) => card(it, i === 0 && !S.query)).join("");
     if (list.length > S.shown) body += `<button class="more" data-act="more">Voir plus (${list.length - S.shown})</button>`;
@@ -299,11 +436,15 @@ function viewPrix() {
 
 /* ----- Réglages ----- */
 function viewReglages() {
-  const srcs = S.feed ? [...new Set(S.feed.items.map(i => i.source))].sort((a, b) => a.localeCompare(b)) : [];
+  const srcs = [...new Set(allItems().map(i => i.source))].sort((a, b) => a.localeCompare(b));
   const st = S.status;
   const status = st ? Object.entries(st.sources).map(([n, s]) => `<div class="switch"><span>${esc(n)}</span><span class="tiny ${s.ok ? "ok" : "err"}">${s.ok ? s.count + " infos" : "en panne"}</span></div>`).join("") : '<p class="small muted">Disponible après le chargement du fil.</p>';
   return `<div class="stack">
     <header class="top"><div class="brand">Réglages</div></header>
+    <div class="box stack"><h3>Skin</h3>
+      <div class="skins">${SKINS.map(k => `<button class="skin-card" data-skin="${k.id}" aria-pressed="${skin() === k.id}"><div class="sw" style="background:${k.colors[0]}">${k.colors.slice(1).map(c => `<i style="background:${c}"></i>`).join("")}</div><div class="nm">${k.name}</div></button>`).join("")}</div>
+      <p class="tiny muted">Astuce : le bouton palette en haut du fil passe au skin suivant.</p>
+    </div>
     <div class="box stack"><h3>Lecture audio</h3>
       <div class="switch"><span>Voix humaine (préparée par le robot)<div class="tiny muted">Sinon, voix Android</div></span><input type="checkbox" data-set="voice" ${S.settings.voice === "humaine" ? "checked" : ""}></div>
       <div class="field"><label for="rate">Vitesse : <span class="num">${S.settings.rate.toFixed(1)}×</span></label><input id="rate" type="range" min="0.8" max="1.5" step="0.1" value="${S.settings.rate}" data-set="rate"></div>
@@ -311,7 +452,7 @@ function viewReglages() {
     <div class="box stack"><h3>Sources affichées</h3>
       ${srcs.length ? srcs.map(n => `<label class="switch"><span>${esc(n)}</span><input type="checkbox" data-src="${esc(n)}" ${S.hidden.has(n) ? "" : "checked"}></label>`).join("") : '<p class="small muted">Disponible après le chargement du fil.</p>'}
     </div>
-    <div class="box stack"><h3>État des sources</h3><p class="tiny muted">${st ? "Dernier passage du robot " + ago(st.updated) + " · traduction : " + Object.entries(st.translation).filter(([, v]) => v).map(([k, v]) => `${k} ${v}`).join(", ") : ""}</p>${status}</div>
+    <div class="box stack"><h3>État des sources</h3><div class="switch"><span>Reddit (lu par ton téléphone)</span><span class="tiny ${S.redditErr ? "err" : "ok"}">${S.redditErr ? "indisponible" : S.reddit ? S.reddit.items.length + " infos · " + ago(S.reddit.at) : "pas encore lu"}</span></div><p class="tiny muted">${st ? "Dernier passage du robot " + ago(st.updated) + " · traduction : " + Object.entries(st.translation).filter(([, v]) => v).map(([k, v]) => `${k} ${v}`).join(", ") : ""}</p>${status}</div>
     <div class="box stack"><h3>Accès</h3>
       <div class="field"><label for="tk2">Code d'accès GitHub</label><input id="tk2" class="input" value="${esc(S.settings.token)}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
       <div class="field"><label for="ik2">Clé IsThereAnyDeal</label><input id="ik2" class="input" value="${esc(S.settings.itad)}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
@@ -321,11 +462,11 @@ function viewReglages() {
 }
 
 /* ----- article ----- */
-function findItem(id) { return S.feed && S.feed.items.find(i => i.id === id); }
+function findItem(id) { return allItems().find(i => i.id === id); }
 function openArticle(id) {
   const it = findItem(id);
   if (!it) return;
-  S.read.add(id); saveRead();
+  markRead(id);
   const media = it.video
     ? `<div class="art-media" ${bg(it.image || `https://i.ytimg.com/vi/${it.video}/hqdefault.jpg`)} data-yt="${esc(it.video)}"><div class="play"><span>${ICON.play}</span></div></div>`
     : it.image ? `<div class="art-media" ${bg(it.image)}></div>` : "";
@@ -415,7 +556,7 @@ function renderPlayer() {
 /* ---------- navigation ---------- */
 function renderNav() {
   const tabs = [["fil", "Fil", ICON.news], ["prix", "Prix PC", ICON.tag], ["reglages", "Réglages", ICON.gear]];
-  $("#nav").innerHTML = `<div class="nav-in">${tabs.map(([k, l, i]) => `<button data-tab="${k}" ${S.tab === k ? 'aria-current="page"' : ""}>${i}<span>${l}</span></button>`).join("")}</div>`;
+  $("#nav").innerHTML = `<div class="nav-in">${tabs.map(([k, l, i], n) => `<button data-tab="${k}" ${S.tab === k ? 'aria-current="page"' : ""}>${i}<span><span class="slot">${n + 1} </span>${l}</span></button>`).join("")}</div>`;
 }
 function render() {
   const app = $("#app");
@@ -436,9 +577,11 @@ document.addEventListener("click", e => {
   if (d.listen) { const it = findItem(d.listen); P.queue = []; P.idx = -1; if (it) playItem(it); return; }
   if (d.filter) { S.filter = d.filter; store.set("filter", S.filter); S.shown = PAGE; render(); window.scrollTo(0, 0); return; }
   if (d.tab) { S.tab = d.tab; render(); window.scrollTo(0, 0); return; }
+  if (d.skin && t.classList.contains("skin-card")) { S.settings.skin = d.skin; saveSettings(); applySkin(); return render(); }
   if (d.game != null) return loadPrices(S.price.results[+d.game]);
   switch (d.act) {
     case "refresh": return loadFeed(true);
+    case "skin": return nextSkin();
     case "more": S.shown += PAGE; return render();
     case "close": return closeSheet();
     case "pp": return togglePlay();
@@ -487,5 +630,7 @@ if (Plug.App) {
   Plug.App.addListener("resume", () => { if (S.feed && Date.now() / 1000 - S.feed.updated > 1800) loadFeed(); });
 }
 
+applySkin();
 render();
 loadFeed();
+loadReddit();
