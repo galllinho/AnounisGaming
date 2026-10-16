@@ -155,7 +155,7 @@ class Igdb:
 
 # ---------- articles de rumeurs ----------
 
-GEMINI_MODELS = [m for m in [os.environ.get("GEMINI_MODEL", "")] if m] + ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"]
+GEMINI_MODELS = [m for m in [os.environ.get("GEMINI_MODEL", "")] if m] + ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.0-flash"]
 
 
 def gemini_call(payload, timeout=90):
@@ -164,22 +164,32 @@ def gemini_call(payload, timeout=90):
     if not key:
         return None
     last = None
-    for model in GEMINI_MODELS:
-        r = requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                          headers={"x-goog-api-key": key, "Content-Type": "application/json"}, json=payload, timeout=timeout)
-        if r.status_code == 404:
-            last = f"modèle {model} introuvable"
-            continue
-        if r.status_code >= 400:
-            raise RuntimeError(f"Gemini {r.status_code} : {r.text[:160]}")
-        GEMINI_MODELS[:] = [model] + [m for m in GEMINI_MODELS if m != model]
-        return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+    for model in list(GEMINI_MODELS):
+        for attempt in range(2):
+            try:
+                r = requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                                  headers={"x-goog-api-key": key, "Content-Type": "application/json"}, json=payload, timeout=timeout)
+            except requests.exceptions.Timeout:
+                last = f"{model} : délai dépassé"
+                break
+            if r.status_code in (429, 500, 503):
+                # modèle saturé : petite pause, puis on essaie le modèle suivant
+                last = f"{model} : {r.status_code} (saturé)"
+                time.sleep(6)
+                continue
+            if r.status_code == 404:
+                last = f"modèle {model} introuvable"
+                break
+            if r.status_code >= 400:
+                raise RuntimeError(f"Gemini {r.status_code} : {r.text[:160]}")
+            GEMINI_MODELS[:] = [model] + [m for m in GEMINI_MODELS if m != model]
+            return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
     raise RuntimeError(last or "Gemini indisponible")
 
 
 def _gemini(prompt):
     return gemini_call({"contents": [{"parts": [{"text": prompt}]}],
-                        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 900}}, timeout=60)
+                        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 900}}, timeout=90)
 
 
 def write_rumor(it, members, table, state):
