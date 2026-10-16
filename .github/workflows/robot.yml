@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  models: read
 
 concurrency:
   group: robot
@@ -44,6 +45,7 @@ jobs:
       - name: Lire, traduire, regrouper, enregistrer l'audio
         env:
           DEEPL_KEY: ${{ secrets.DEEPL_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python robot/robot.py --out data-out
 
       - name: Publier le fil sur la branche data

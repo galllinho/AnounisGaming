@@ -156,8 +156,10 @@ class Translator:
     def __init__(self):
         self.deepl_key = os.environ.get("DEEPL_KEY", "").strip()
         self.deepl_ok = bool(self.deepl_key)
-        self.used = {"deepl": 0, "microsoft": 0, "google": 0, "aucune": 0}
-        self.ms_ok = True
+        self.used = {"deepl": 0, "github-models": 0, "microsoft": 0, "google": 0, "aucune": 0}
+        self.gh_token = os.environ.get("GITHUB_TOKEN", "").strip()
+        self.gh_ok = bool(self.gh_token)
+        self.ms_ok = False  # l'accès gratuit Microsoft a fermé (404)
         self.ms_token = None
         self.ms_time = 0
         self.last_error = None
@@ -175,6 +177,45 @@ class Translator:
             raise RuntimeError(f"DeepL {r.status_code}")
         r.raise_for_status()
         return [t["text"] for t in r.json()["translations"]]
+
+    def _github_models(self, texts):
+        """IA gratuite de GitHub (GPT-4o mini), 20 textes par demande."""
+        out = []
+        for i in range(0, len(texts), 20):
+            chunk = texts[i:i + 20]
+            prompt = (
+                "Traduis en français naturel chaque texte de ce tableau JSON (actualité jeu vidéo). "
+                "Ne traduis pas les noms de jeux, de studios, de consoles ni de personnes. "
+                "Réponds uniquement avec un objet JSON {\"t\": [...]} contenant exactement "
+                f"{len(chunk)} traductions, dans le même ordre.\n\n" + json.dumps(chunk, ensure_ascii=False)
+            )
+            for attempt in range(3):
+                r = requests.post(
+                    "https://models.github.ai/inference/chat/completions",
+                    headers={"Authorization": f"Bearer {self.gh_token}", "Accept": "application/vnd.github+json",
+                             "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json"},
+                    json={"model": "openai/gpt-4o-mini", "temperature": 0,
+                          "response_format": {"type": "json_object"},
+                          "messages": [{"role": "user", "content": prompt}]},
+                    timeout=90,
+                )
+                if r.status_code == 429:
+                    wait = int(r.headers.get("retry-after", "0") or 0)
+                    if wait > 90:
+                        raise RuntimeError(f"quota GitHub Models atteint ({wait} s)")
+                    time.sleep(max(wait, 10))
+                    continue
+                if r.status_code >= 400:
+                    raise RuntimeError(f"GitHub Models {r.status_code} : {r.text[:200]}")
+                res = json.loads(r.json()["choices"][0]["message"]["content"]).get("t", [])
+                if len(res) == len(chunk):
+                    break
+                res = None
+            if not res:
+                raise RuntimeError("GitHub Models : réponse incomplète")
+            out += [str(x) for x in res]
+            time.sleep(4)
+        return out
 
     def _ms_auth(self):
         if not self.ms_token or time.time() - self.ms_time > 480:
@@ -271,6 +312,14 @@ class Translator:
                 log("DeepL indisponible, bascule :", exc)
                 self.errors.append(f"deepl: {exc}"[:300])
                 self.deepl_ok = False
+        if result is None and self.gh_ok:
+            try:
+                result = self._github_models(payload)
+                self.used["github-models"] += len(payload)
+            except Exception as exc:
+                log("GitHub Models indisponible :", exc)
+                self.errors.append(f"github-models: {exc}"[:300])
+                self.gh_ok = False
         if result is None and self.ms_ok:
             try:
                 result = self._microsoft(payload)
