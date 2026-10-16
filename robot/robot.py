@@ -161,6 +161,7 @@ class Translator:
         self.ms_token = None
         self.ms_time = 0
         self.last_error = None
+        self.errors = []
 
     def _deepl(self, texts):
         host = "api-free.deepl.com" if self.deepl_key.endswith(":fx") else "api.deepl.com"
@@ -178,7 +179,8 @@ class Translator:
     def _ms_auth(self):
         if not self.ms_token or time.time() - self.ms_time > 480:
             r = requests.get("https://edge.microsoft.com/translate/auth", headers={"User-Agent": UA}, timeout=20)
-            r.raise_for_status()
+            if r.status_code >= 400:
+                raise RuntimeError(f"auth {r.status_code} : {r.text[:200]}")
             self.ms_token, self.ms_time = r.text.strip(), time.time()
         return self.ms_token
 
@@ -200,7 +202,8 @@ class Translator:
                 if r.status_code == 401:
                     self.ms_token = None
                     continue
-                r.raise_for_status()
+                if r.status_code >= 400:
+                    raise RuntimeError(f"Microsoft {r.status_code} : {r.text[:200]}")
                 break
             else:
                 raise RuntimeError(f"Microsoft {r.status_code}")
@@ -265,7 +268,8 @@ class Translator:
                 result = self._deepl(payload)
                 self.used["deepl"] += len(payload)
             except Exception as exc:
-                log("DeepL indisponible, bascule sur Google :", exc)
+                log("DeepL indisponible, bascule :", exc)
+                self.errors.append(f"deepl: {exc}"[:300])
                 self.deepl_ok = False
         if result is None and self.ms_ok:
             try:
@@ -274,6 +278,7 @@ class Translator:
             except Exception as exc:
                 log("Microsoft indisponible, bascule sur Google :", exc)
                 self.last_error = f"microsoft: {exc}"
+                self.errors.append(self.last_error[:300])
                 self.ms_ok = False
         if result is None:
             try:
@@ -504,6 +509,7 @@ def main():
         "sources": status,
         "translation": tr.used,
         "translation_error": tr.last_error,
+        "translation_errors": tr.errors,
         "audio_new": made,
     }, ensure_ascii=False, indent=1), "utf-8")
     heads = sum(1 for it in items if not it.get("group"))
