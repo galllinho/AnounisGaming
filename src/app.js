@@ -12,7 +12,7 @@ const PAGE = 40;
 /* ---------- état et stockage ---------- */
 const store = {
   get(k, d) { try { const v = localStorage.getItem("ag." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem("ag." + k, JSON.stringify(v)); } catch {} }
+  set(k, v) { try { localStorage.setItem("ag." + k, JSON.stringify(v)); } catch { try { localStorage.removeItem("ag." + k); } catch {} } }
 };
 const S = {
   tab: "fil",
@@ -107,14 +107,26 @@ function openUrl(url) {
 /* ---------- données (branche data du dépôt privé) ---------- */
 async function gh(path, as = "json") {
   if (!S.settings.token) throw new Error("token");
-  const r = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}?ref=${DATA_BRANCH}`, {
-    headers: { Authorization: `Bearer ${S.settings.token.trim()}`, Accept: "application/vnd.github.raw+json", "X-GitHub-Api-Version": "2022-11-28" },
-    cache: "no-store"
-  });
-  if (r.status === 401) throw new Error("Le code d'accès GitHub est refusé. Vérifie-le dans Réglages.");
-  if (r.status === 404) throw new Error("Le fil n'existe pas encore : le robot n'est peut-être pas encore passé.");
-  if (!r.ok) throw new Error(`GitHub répond ${r.status}`);
-  return as === "blob" ? r.blob() : r.json();
+  const url = `https://api.github.com/repos/${REPO}/contents/${path}?ref=${DATA_BRANCH}&t=${Date.now()}`;
+  const headers = { Authorization: `Bearer ${S.settings.token.trim()}`, Accept: "application/vnd.github.raw+json", "X-GitHub-Api-Version": "2022-11-28" };
+  let status, data;
+  if (NATIVE && Plug.CapacitorHttp) {
+    // couche réseau native d'Android : pas de blocage CORS
+    const r = await Plug.CapacitorHttp.request({ method: "GET", url, headers, responseType: as === "blob" ? "blob" : "text", connectTimeout: 20000, readTimeout: 60000 });
+    status = r.status; data = r.data;
+    if (status >= 200 && status < 300) {
+      if (as === "blob") return "data:audio/mpeg;base64," + data;
+      return typeof data === "string" ? JSON.parse(data) : data;
+    }
+  } else {
+    const r = await fetch(url, { headers, cache: "no-store" });
+    status = r.status;
+    if (r.ok) return as === "blob" ? URL.createObjectURL(await r.blob()) : r.json();
+  }
+  if (status === 401) throw new Error("Le code d'accès GitHub est refusé. Vérifie-le dans Réglages.");
+  if (status === 403) throw new Error("GitHub refuse l'accès (403) : le code doit avoir « Contents : Read-only » sur AnounisGaming.");
+  if (status === 404) throw new Error("Fil introuvable (404) : vérifie que le code donne accès au dépôt AnounisGaming.");
+  throw new Error(`GitHub répond ${status}`);
 }
 
 async function loadFeed(manual) {
@@ -128,7 +140,7 @@ async function loadFeed(manual) {
     if (manual) toast("Fil à jour");
     loadReddit(manual);
   } catch (e) {
-    S.error = e.message === "token" ? null : e.message;
+    S.error = e.message === "token" ? null : (e.message || String(e));
   }
   S.loading = false; render();
 }
@@ -511,10 +523,10 @@ async function playItem(it) {
   P.item = it; P.playing = true; P.tts = false; renderPlayer();
   if (it.audio && S.settings.voice === "humaine") {
     try {
-      const blob = await gh(`audio/${it.id}.mp3`, "blob");
+      const src = await gh(`audio/${it.id}.mp3`, "blob");
       if (P.item !== it) return;
-      if (P.url) URL.revokeObjectURL(P.url);
-      P.url = URL.createObjectURL(blob);
+      if (P.url && P.url.startsWith("blob:")) URL.revokeObjectURL(P.url);
+      P.url = src;
       P.audio.src = P.url; P.audio.playbackRate = S.settings.rate;
       await P.audio.play();
       return;
