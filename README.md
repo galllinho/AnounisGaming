@@ -27,3 +27,13 @@ Les nouvelles versions s'installent par-dessus l'ancienne sans perdre tes régla
 - **Quota gratuit** : un dépôt privé dispose de 2 000 minutes d'Actions par mois, partagées entre tes dépôts. Le robot en consomme environ 1 200. Si tu ajoutes des passages, surveille **Settings → Billing**.
 
 GitHub met en pause les tâches planifiées d'un dépôt sans activité pendant 60 jours : si le fil ne se met plus à jour, relance le robot à la main une fois.
+
+## Options gratuites du robot (facultatives)
+
+Dans **Settings → Secrets and variables → Actions → New repository secret** :
+
+| Secret | À quoi il sert | Où l'obtenir |
+|---|---|---|
+| `GEMINI_KEY` | Les rumeurs sont rédigées comme de vrais articles (sinon : assemblées à partir des sources) | Google AI Studio, clé API gratuite |
+| `TWITCH_CLIENT_ID` et `TWITCH_CLIENT_SECRET` | Images officielles et trailers des jeux (IGDB) | dev.twitch.tv → Your Console → Register Your Application |
+| `DEEPL_KEY` | Traduction de meilleure qualité | DeepL API Free |

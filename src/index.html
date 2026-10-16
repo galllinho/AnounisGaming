@@ -293,8 +293,47 @@ body[data-skin="hud"] .section-t{color:var(--accent)}
 /* éléments propres à un skin, masqués ailleurs */
 .hero-tag,.ambient,.rail-t,.player-card,.nav .slot{display:none}
 body[data-skin="hud"] .player-card{display:flex}
-body[data-skin="hud"] .top .brand{visibility:hidden}
+body[data-skin="hud"] .fil-top .brand{visibility:hidden}
 input[type=range]{accent-color:var(--accent)}
+
+/* ---------- V2 : bons plans, brief, rumeurs ---------- */
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px}
+.seg button{padding:10px 6px;border-radius:9px;font-weight:700;font-size:14px;color:var(--muted);font-family:var(--label)}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.small-seg{width:160px}
+.small-seg button{padding:7px 6px}
+.regions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.regions .btn{padding:11px 10px;font-size:14px}
+.wish{display:flex;gap:12px;align-items:center;padding:12px;border-bottom:1px solid var(--line)}
+.wish:last-child{border-bottom:0}
+.wish.hit{background:var(--accent-soft)}
+.wish img{width:46px;height:62px;object-fit:cover;border-radius:8px;background:var(--surface2);flex:none}
+.wish-best{display:block;text-align:left;margin-top:4px;font-size:13.5px}
+.wish-act{display:flex;flex-direction:column;gap:6px}
+.wish-act .iconbtn{width:36px;height:36px}
+.wish-act .iconbtn svg{width:16px;height:16px}
+.card.free .media{aspect-ratio:16/8;background:var(--surface2) center/cover no-repeat}
+.card.free .body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:8px}
+.gallery{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px;scroll-snap-type:x mandatory}
+.gallery::-webkit-scrollbar{display:none}
+.gallery img{height:150px;border-radius:12px;flex:none;scroll-snap-align:start;background:var(--surface2)}
+.rel{display:inline-flex;gap:3px;vertical-align:middle}
+.rel i{width:14px;height:6px;border-radius:2px;background:var(--line);display:block}
+.rel i.on{background:var(--rumor)}
+.warn.confirme{background:var(--ok-soft);border-color:var(--ok);color:var(--fg)}
+.warn.dementi{background:var(--accent-soft);border-color:var(--accent);color:var(--fg)}
+.brief{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px}
+.brief-ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--rumor-soft);color:var(--rumor);flex:none}
+.brief-ic svg{width:22px;height:22px}
+body[data-skin="console"] .brief-ic{background:rgba(245,180,60,.18);color:#F5B43C}
+body[data-skin="neon"] .brief{border:1.5px solid var(--rumor);box-shadow:0 0 14px rgba(255,225,77,.2)}
+body[data-skin="hud"] .brief{clip-path:var(--cut);border-color:var(--xp)}
+body[data-skin="hud"] .brief b::before{content:"◆ ";color:var(--xp)}
+body[data-skin="console"] .seg,body[data-skin="console"] .seg button{border-radius:999px}
+body[data-skin="hud"] .seg,body[data-skin="hud"] .seg button{border-radius:0}
+body[data-skin="hud"] .seg button[aria-pressed="true"]{background:var(--accent);color:#0A0D10}
+body[data-skin="neon"] .seg button{font-size:9px;text-transform:uppercase}
+body[data-skin="neon"] .seg button[aria-pressed="true"]{background:var(--accent);color:#07070F}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 <div id="app"></div>

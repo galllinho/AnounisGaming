@@ -25,11 +25,18 @@ const S = {
   status: null,
   read: new Set(store.get("read", [])),
   hidden: new Set(store.get("hiddenSources", [])),
-  settings: Object.assign({ token: "", itad: "", rate: 1, voice: "humaine", skin: "neon" }, store.get("settings", {})),
+  settings: Object.assign({ token: "", itad: "", rate: 1, voice: "humaine", skin: "neon", briefNotif: true, briefTime: "07:40" }, store.get("settings", {})),
+  wish: store.get("wish", []),
+  wishPrices: store.get("wishPrices", null),
+  wishLoading: false,
+  free: store.get("free", null),
+  freeLoading: false,
+  plansTab: "prix",
+  brief: store.get("brief", null),
   today: store.get("today", { d: "", n: 0 }),
   reddit: store.get("reddit", null),
   redditErr: null,
-  price: { q: "", results: null, game: null, rows: null, loading: false, error: null, low: null }
+  price: { q: "", results: null, game: null, rows: null, loading: false, error: null, low: null, platform: "pc", psq: "" }
 };
 const saveSettings = () => store.set("settings", S.settings);
 const saveRead = () => store.set("read", [...S.read].slice(-1500));
@@ -80,6 +87,8 @@ const ICON = {
   tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>',
   gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   palette: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.9 1.2-1.8-.5-1.1.2-2.2 1.4-2.2H17a4 4 0 0 0 4-4c0-5.5-4-10-9-10z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg>',
+  bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
+  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L21 2M16 7l3 3M18 5l2 2"/></svg>'
 };
 const LANG = { en: "EN", ja: "JP", fr: "FR", auto: "" };
@@ -137,6 +146,7 @@ async function loadFeed(manual) {
     S.feed = { updated: feed.updated, items: feed.items };
     store.set("feed", S.feed);
     gh("status.json").then(s => { S.status = s; if (S.tab === "reglages") render(); }).catch(() => {});
+    gh("brief.json").then(b => { S.brief = b; store.set("brief", b); render(); }).catch(() => {});
     if (manual) toast("Fil à jour");
     loadReddit(manual);
   } catch (e) {
@@ -229,7 +239,10 @@ function heads() {
 /* ---------- rendu ---------- */
 function badges(it) {
   const b = [];
-  if (it.rumor) b.push(`<span class="badge b-rumor">${skin() === "hud" ? "Intel non confirmé" : "Rumeur"}</span>`);
+  const st = it.article && it.article.status;
+  if (st === "dementi") b.push('<span class="badge b-rumor">Démenti</span>');
+  else if (it.rumor) b.push(`<span class="badge b-rumor">${skin() === "hud" ? "Intel non confirmé" : "Rumeur"}${it.reliability ? ` ${it.reliability}/5` : ""}</span>`);
+  else if (st === "confirme") b.push('<span class="badge b-off">Confirmé</span>');
   if (it.kind === "officiel") b.push('<span class="badge b-off">Officiel</span>');
   for (const p of it.platforms || []) b.push(`<span class="badge ${p === "PS5" ? "b-ps5" : "b-pc"}">${p}</span>`);
   const n = (it.also || []).length;
@@ -240,17 +253,18 @@ function meta(it) {
   const flag = it.translated && LANG[it.lang] ? `<span class="flag" title="Traduit">${LANG[it.lang]}→FR</span>` : "";
   return `<div class="meta"><span>${esc(it.source)}</span><span class="dot"></span><span>${ago(it.published)}</span>${flag}</div>`;
 }
+const pic = it => it.image || it.cover || (it.gallery && it.gallery[0]) || (it.video ? `https://i.ytimg.com/vi/${it.video}/hqdefault.jpg` : null);
 const bg = url => url ? `style="background-image:url('${esc(url).replace(/'/g, "%27")}')"` : "";
 const playOverlay = it => it.video ? `<div class="play"><span>${ICON.play}</span></div>` : "";
 const HERO_TAG = { neon: "À la une", hud: "▶ Mission principale" };
 function card(it, hero) {
   const read = (S.read.has(it.id) ? " read" : "") + (it.rumor ? " is-rumor" : "");
   if (hero) return `<button class="card hero${read}" data-open="${it.id}">
-      <div class="media" ${bg(it.image)}>${HERO_TAG[skin()] ? `<span class="hero-tag">${HERO_TAG[skin()].toUpperCase()}</span>` : ""}${playOverlay(it)}</div>
+      <div class="media" ${bg(pic(it))}>${HERO_TAG[skin()] ? `<span class="hero-tag">${HERO_TAG[skin()].toUpperCase()}</span>` : ""}${playOverlay(it)}</div>
       <div class="body">${meta(it)}<h2>${esc(it.title)}</h2>${badges(it)}</div></button>`;
   return `<button class="card${read}" data-open="${it.id}"><div class="item">
       <div class="txt">${meta(it)}<h3>${esc(it.title)}</h3>${badges(it)}</div>
-      ${it.image ? `<div class="thumb" ${bg(it.image)}>${playOverlay(it)}</div>` : ""}</div></button>`;
+      ${pic(it) ? `<div class="thumb" ${bg(pic(it))}>${playOverlay(it)}</div>` : ""}</div></button>`;
 }
 
 const FILTERS = [["tout", "Tout"], ["ps5", "PS5"], ["pc", "PC"], ["rumeurs", "Rumeurs"], ["officiel", "Officiel"], ["videos", "Vidéos"], ["communaute", "Communauté"]];
@@ -259,14 +273,14 @@ const filterLabel = (k, l) => skin() === "hud" && k === "rumeurs" ? "Intel" : l;
 function consoleHero(it) {
   const tag = ["À la une", ...(it.platforms || [])].join(" · ").toUpperCase();
   const n = (it.also || []).length;
-  return `<div class="ambient" ${bg(it.image)}></div>
+  return `<div class="ambient" ${bg(pic(it))}></div>
     <div class="chero"><span class="tag">${esc(tag)}</span><h2>${esc(it.title)}</h2>
     <div class="small muted">${esc(it.source)}${n ? ` et ${n} autre${n > 1 ? "s" : ""} source${n > 1 ? "s" : ""}` : ""} · ${ago(it.published)}</div>
     <div class="btns">${it.video ? `<button class="btn primary" data-open="${it.id}">${ICON.play.replace("<svg", '<svg width="16" height="16" fill="currentColor"')} Voir la vidéo</button>` : `<button class="btn primary" data-listen="${it.id}">${ICON.headphones} Écouter</button>`}
     <button class="btn" data-open="${it.id}">Lire</button></div></div>`;
 }
 function tile(it) {
-  return `<button class="tile${S.read.has(it.id) ? " read" : ""}" data-open="${it.id}"><div class="ph" ${bg(it.image)}>${badges({ ...it, also: [] })}${playOverlay(it)}</div><b>${esc(it.title)}</b></button>`;
+  return `<button class="tile${S.read.has(it.id) ? " read" : ""}" data-open="${it.id}"><div class="ph" ${bg(pic(it))}>${badges({ ...it, also: [] })}${playOverlay(it)}</div><b>${esc(it.title)}</b></button>`;
 }
 function playerCard(total) {
   const today = S.today.d === dayKey() ? S.today.n : 0;
@@ -278,13 +292,32 @@ function playerCard(total) {
     <div class="tiny muted">${today} infos lues sur ${goal} aujourd'hui${S.feed ? " · màj " + ago(S.feed.updated) : ""}</div></div></div>`;
 }
 
+const localDay = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+function briefCard() {
+  const b = S.brief;
+  if (!b || b.date !== localDay() || S.filter !== "tout" || S.query) return "";
+  return `<div class="brief"><div class="row" style="gap:12px"><span class="brief-ic">${ICON.sun}</span>
+    <div class="grow"><b>Brief du matin</b><div class="tiny muted">${esc(b.label)} · ${b.items.length} infos · 2 min</div></div></div>
+    <div class="btns"><button class="btn primary" data-act="brief-play">${ICON.headphones} Écouter</button><button class="btn" data-act="brief-open">Voir les infos</button></div></div>`;
+}
+function openBrief() {
+  const b = S.brief; if (!b) return;
+  const list = b.items.map(findItem).filter(Boolean);
+  $("#sheet-root").innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="sheet-in stack">
+    <div class="row between"><button class="iconbtn" data-act="close" aria-label="Retour">${ICON.back}</button></div>
+    <h1 style="font-size:26px">Brief du ${esc(b.label)}</h1>
+    <button class="btn primary block" data-act="brief-play">${ICON.headphones} Écouter le brief</button>
+    ${list.map(it => card(it, false)).join("")}</div></div>`;
+  document.body.style.overflow = "hidden";
+}
+
 function viewFil() {
   if (!S.settings.token) return viewSetup();
   const list = heads();
   const sk = skin();
   const brand = sk === "neon" ? '<span class="b1">ANOUNIS</span><span class="b2">GAMING</span>' : "<i></i>AnounisGaming";
   const upd = S.feed ? (sk === "neon" ? `Live · ${list.length} infos · màj ${ago(S.feed.updated)}` : "Mis à jour " + ago(S.feed.updated)) : "Chargement…";
-  const top = `<header class="top"><div><div class="brand">${brand}</div>
+  const top = `<header class="top fil-top"><div><div class="brand">${brand}</div>
       ${sk === "hud" ? "" : `<div class="updated">${upd}</div>`}</div>
       <div class="row"><button class="iconbtn" data-act="skin" aria-label="Changer de skin">${ICON.palette}</button>
       <button class="iconbtn" data-act="listen-all" aria-label="Écouter le fil">${ICON.headphones}</button>
@@ -299,7 +332,7 @@ function viewFil() {
   else if (sk === "console" && !S.query) {
     const rail = list.slice(1, 9), rest = list.slice(9, S.shown);
     const err = S.error && S.feed ? `<p class="small err">${esc(S.error)}</p>` : "";
-    return `<div class="stack">${top}${consoleHero(list[0])}${chips}${search}${err}
+    return `<div class="stack">${top}${consoleHero(list[0])}${briefCard()}${chips}${search}${err}
       ${rail.length ? `<div class="rail-t">Les dernières infos</div><div class="rail">${rail.map(tile).join("")}</div>` : ""}
       ${rest.map(it => card(it, false)).join("")}
       ${list.length > S.shown ? `<button class="more" data-act="more">Voir plus (${list.length - S.shown})</button>` : ""}</div>`;
@@ -309,7 +342,7 @@ function viewFil() {
     if (list.length > S.shown) body += `<button class="more" data-act="more">Voir plus (${list.length - S.shown})</button>`;
   }
   const err = S.error && S.feed ? `<p class="small err">${esc(S.error)}</p>` : "";
-  return `<div class="stack">${top}${chips}${search}${err}${body}</div>`;
+  return `<div class="stack">${top}${briefCard()}${chips}${search}${err}${body}</div>`;
 }
 
 function viewSetup() {
@@ -331,9 +364,11 @@ function viewSetup() {
     </div></div>`;
 }
 
-/* ----- Prix PC ----- */
+/* ----- Bons plans : prix PC, liste de souhaits, jeux gratuits, PS5 ----- */
 const COUNTRIES = [["FR", "France"], ["GB", "Royaume-Uni"], ["US", "États-Unis"], ["CA", "Canada"], ["PL", "Pologne"], ["TR", "Turquie"], ["BR", "Brésil"], ["MX", "Mexique"], ["IN", "Inde"], ["JP", "Japon"], ["AU", "Australie"]];
+const PS_REGIONS = [["fr-fr", "France"], ["en-us", "États-Unis"], ["en-gb", "Royaume-Uni"], ["tr-tr", "Turquie"], ["pl-pl", "Pologne"], ["pt-br", "Brésil"], ["en-in", "Inde"], ["ja-jp", "Japon"]];
 const FLAG = c => String.fromCodePoint(...[...c].map(ch => 127397 + ch.charCodeAt(0)));
+const countryName = c => (COUNTRIES.find(x => x[0] === c) || [])[1] || c;
 
 async function http(method, url, data) {
   if (NATIVE && Plug.CapacitorHttp) {
@@ -354,14 +389,44 @@ async function rates() {
   throw new Error("Taux de change indisponibles");
 }
 const toEur = (amount, cur) => (RATES && RATES[cur]) ? amount / RATES[cur] : null;
+const itadKey = () => encodeURIComponent(S.settings.itad.trim());
+
+/* prix de plusieurs jeux d'un coup, dans tous les pays suivis */
+async function fetchPrices(ids) {
+  await rates();
+  const out = {};
+  ids.forEach(id => { out[id] = { rows: [], low: null }; });
+  const res = await Promise.all(COUNTRIES.map(([c]) =>
+    http("POST", `https://api.isthereanydeal.com/games/prices/v3?key=${itadKey()}&country=${c}&deals=false&vouchers=true&capacity=8`, ids)
+      .then(d => [c, d]).catch(() => [c, null])));
+  for (const [c, d] of res) {
+    for (const g of d || []) {
+      const o = out[g.id];
+      if (!o) continue;
+      if (c === "FR" && g.historyLow && g.historyLow.all) o.low = g.historyLow.all;
+      for (const deal of g.deals || []) {
+        const cur = deal.price && deal.price.currency;
+        const eur = toEur(deal.price.amount, cur);
+        if (eur == null) continue;
+        o.rows.push({ country: c, shop: deal.shop && deal.shop.name, local: deal.price.amount, cur, eur, cut: deal.cut || 0, url: deal.url, drm: (deal.drm || []).map(x => x.name).join(", ") });
+      }
+    }
+  }
+  for (const id of ids) {
+    const seen = new Set();
+    out[id].rows = out[id].rows.sort((a, b) => a.eur - b.eur).filter(r => { const k = r.shop + "|" + r.country; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 40);
+  }
+  return out;
+}
 
 async function searchGames() {
   const P = S.price, q = P.q.trim();
   if (!q) return;
-  P.loading = true; P.error = null; P.game = null; P.rows = null; render();
+  P.game = null; P.rows = null; P.error = null;
+  if (P.platform === "ps5") { P.results = null; P.psq = q; return render(); }
+  P.loading = true; render();
   try {
-    const key = encodeURIComponent(S.settings.itad.trim());
-    P.results = await http("GET", `https://api.isthereanydeal.com/games/search/v1?key=${key}&title=${encodeURIComponent(q)}&results=12`);
+    P.results = await http("GET", `https://api.isthereanydeal.com/games/search/v1?key=${itadKey()}&title=${encodeURIComponent(q)}&results=12`);
   } catch (e) { P.error = "Recherche impossible. Vérifie ta clé IsThereAnyDeal dans Réglages."; }
   P.loading = false; render();
 }
@@ -377,27 +442,8 @@ async function loadPrices(game) {
   const P = S.price;
   P.game = game; P.rows = null; P.low = null; P.loading = true; P.error = null; render();
   try {
-    await rates();
-    const key = encodeURIComponent(S.settings.itad.trim());
-    const res = await Promise.all(COUNTRIES.map(([c]) =>
-      http("POST", `https://api.isthereanydeal.com/games/prices/v3?key=${key}&country=${c}&deals=false&vouchers=true&capacity=8`, [game.id])
-        .then(d => [c, d]).catch(() => [c, null])));
-    const rows = [];
-    for (const [c, d] of res) {
-      const g = d && d[0];
-      if (!g) continue;
-      if (c === "FR" && g.historyLow && g.historyLow.all) P.low = g.historyLow.all;
-      for (const deal of g.deals || []) {
-        const cur = deal.price && deal.price.currency;
-        const eur = toEur(deal.price.amount, cur);
-        if (eur == null) continue;
-        rows.push({ country: c, shop: deal.shop && deal.shop.name, local: deal.price.amount, cur, eur, cut: deal.cut || 0, url: deal.url, drm: (deal.drm || []).map(x => x.name).join(", ") });
-      }
-    }
-    rows.sort((a, b) => a.eur - b.eur);
-    // une ligne par store et par prix arrondi, pour éviter les répétitions
-    const seen = new Set();
-    P.rows = rows.filter(r => { const k = r.shop + "|" + r.country; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 40);
+    const r = (await fetchPrices([game.id]))[game.id];
+    P.rows = r.rows; P.low = r.low;
     if (!P.rows.length) P.error = "Aucune offre trouvée pour ce jeu dans les stores suivis.";
   } catch (e) { P.error = e.message || "Prix indisponibles"; }
   P.loading = false; render();
@@ -405,45 +451,184 @@ async function loadPrices(game) {
 
 const fmtEur = n => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 const fmtLocal = (n, c) => { try { return n.toLocaleString("fr-FR", { style: "currency", currency: c }); } catch { return n + " " + c; } };
+const lowEur = low => low ? (low.currency === "EUR" ? low.amount : toEur(low.amount, low.currency)) : null;
+const isDeal = (best, low) => best && low && best.eur <= lowEur(low) * 1.1;
 
-function viewPrix() {
-  const P = S.price;
-  const head = `<header class="top"><div><div class="brand">Prix PC</div><div class="updated">Stores officiels, ${COUNTRIES.length} pays, convertis en euros</div></div></header>`;
-  if (!S.settings.itad) return `<div class="stack">${head}<div class="box stack"><h3>Il faut une clé gratuite</h3>
-    <p class="muted">Les prix viennent d'IsThereAnyDeal, qui suit les stores officiels dans chaque pays.</p>
+function priceRow(r, i) {
+  const risk = riskOf(r.shop, r.country);
+  return `<button class="price-row${i === 0 ? " best" : ""}" style="width:100%;text-align:left" data-url="${esc(r.url)}">
+    <div class="eur num">${fmtEur(r.eur)}</div>
+    <div class="grow"><div class="row" style="gap:6px"><b>${esc(r.shop)}</b>${r.cut ? `<span class="cut">-${r.cut}%</span>` : ""}</div>
+    <div class="tiny muted">${FLAG(r.country)} ${esc(countryName(r.country))} · ${fmtLocal(r.local, r.cur)}${r.drm ? " · " + esc(r.drm) : ""}</div>
+    ${risk ? `<div class="risk ${risk[0]}">${risk[1]}</div>` : ""}</div>
+    <span class="muted">${ICON.ext.replace("<svg", '<svg width="18" height="18"')}</span></button>`;
+}
+
+function ps5Links(title) {
+  const q = encodeURIComponent(title);
+  return `<div class="box stack"><h3>PS5 : prix par région</h3>
+    <p class="small muted">Sony ne publie pas ses prix : l'appli ouvre directement la recherche dans chaque PlayStation Store régional.</p>
+    <div class="regions">${PS_REGIONS.map(([loc, name]) => `<button class="btn" data-url="https://store.playstation.com/${loc}/search/${q}">${FLAG(loc.slice(3).toUpperCase())} ${name}</button>`).join("")}</div>
+    <button class="btn block" data-url="https://psprices.com/region-fr/search/?q=${q}&platform=PS5">${ICON.ext} Comparer sur PSPrices</button>
+    <p class="tiny muted">Acheter sur un store étranger demande un compte PSN de ce pays et des cartes cadeaux locales.</p></div>`;
+}
+
+/* ----- liste de souhaits ----- */
+const saveWish = () => { store.set("wish", S.wish); syncRunner(); };
+function wishOf(id) { return S.wish.find(w => w.id === id); }
+async function addWish(game, best) {
+  const def = best ? Math.max(1, Math.floor(best.eur * 0.8)) : 20;
+  const v = prompt(`Prix cible pour ${game.title} (en euros) :`, String(def));
+  if (v == null) return;
+  const target = parseFloat(String(v).replace(",", "."));
+  if (!(target > 0)) return toast("Prix invalide");
+  const ex = wishOf(game.id);
+  if (ex) ex.target = target;
+  else S.wish.push({ id: game.id, title: game.title, art: game.assets && (game.assets.boxart || game.assets.banner300 || game.assets.banner145) || null, target, added: Date.now() });
+  saveWish();
+  await askNotifPermission();
+  toast(`Suivi : alerte sous ${fmtEur(target)}`);
+  render();
+  checkWishlist(false);
+}
+async function checkWishlist(manual) {
+  if (!S.wish.length || !S.settings.itad) return;
+  S.wishLoading = true; if (S.tab === "plans") render();
+  try {
+    const res = await fetchPrices(S.wish.map(w => w.id));
+    S.wishPrices = { at: Date.now(), map: res };
+    store.set("wishPrices", S.wishPrices);
+    if (!Plug.BackgroundRunner) {
+      for (const w of S.wish) {
+        const best = res[w.id] && res[w.id].rows[0];
+        if (best && best.eur <= w.target && (!w.notified || best.eur < w.notified - 0.01)) {
+          w.notified = best.eur;
+          notify(`Baisse de prix : ${w.title}`, `${fmtEur(best.eur)} chez ${best.shop} (${countryName(best.country)}), sous ton objectif de ${fmtEur(w.target)}.`);
+        }
+      }
+      store.set("wish", S.wish);
+    }
+    if (manual) toast("Prix vérifiés");
+  } catch (e) { if (manual) toast("Vérification impossible"); }
+  S.wishLoading = false; if (S.tab === "plans") render();
+}
+
+/* ----- notifications ----- */
+async function askNotifPermission() {
+  if (!Plug.LocalNotifications) return false;
+  try {
+    const p = await Plug.LocalNotifications.checkPermissions();
+    if (p.display === "granted") return true;
+    const r = await Plug.LocalNotifications.requestPermissions();
+    return r.display === "granted";
+  } catch { return false; }
+}
+let notifId = Math.floor(Date.now() / 1000) % 100000;
+function notify(title, body) {
+  if (!Plug.LocalNotifications) return;
+  Plug.LocalNotifications.schedule({ notifications: [{ id: ++notifId, title, body }] }).catch(() => {});
+}
+async function setupBriefNotification() {
+  if (!Plug.LocalNotifications) return;
+  try {
+    await Plug.LocalNotifications.cancel({ notifications: [{ id: 7000 }] });
+    if (!S.settings.briefNotif) return;
+    if (!(await askNotifPermission())) return;
+    const [h, m] = (S.settings.briefTime || "07:40").split(":").map(Number);
+    await Plug.LocalNotifications.schedule({ notifications: [{ id: 7000, title: "Ton brief jeux vidéo est prêt", body: "Les infos de la nuit en 2 minutes, à lire ou à écouter.", schedule: { on: { hour: h, minute: m }, allowWhileIdle: true } }] });
+  } catch {}
+}
+function syncRunner() {
+  if (!Plug.BackgroundRunner) return;
+  Plug.BackgroundRunner.dispatchEvent({ label: "fr.anounis.gaming.check", event: "sync", details: { key: S.settings.itad.trim(), wish: S.wish.map(w => ({ id: w.id, title: w.title, target: w.target, notified: w.notified || null })), countries: COUNTRIES.map(c => c[0]) } }).catch(() => {});
+}
+
+/* ----- jeux gratuits (GamerPower) ----- */
+async function loadFree(force) {
+  if (!force && S.free && Date.now() - S.free.at < 3 * 3600 * 1000) return;
+  S.freeLoading = true; if (S.tab === "plans") render();
+  try {
+    const d = await http("GET", "https://www.gamerpower.com/api/filter?platform=epic-games-store.steam.gog.ps5.ps4.pc&type=game");
+    S.free = { at: Date.now(), items: Array.isArray(d) ? d.slice(0, 30) : [] };
+    store.set("free", S.free);
+  } catch { if (force) toast("Jeux gratuits indisponibles"); }
+  S.freeLoading = false; if (S.tab === "plans") render();
+}
+function psPlusItem() {
+  return allItems().find(it => it.source === "PlayStation Blog" && /playstation plus/i.test(it.title_orig) && /(monthly|games for|jeux)/i.test(it.title_orig));
+}
+
+/* ----- vue Bons plans ----- */
+function viewPlans() {
+  const P = S.price, sub = S.plansTab;
+  const seg = `<div class="seg">${[["prix", "Prix"], ["liste", `Ma liste${S.wish.length ? " (" + S.wish.length + ")" : ""}`], ["gratuits", "Gratuits"]].map(([k, l]) => `<button data-plans="${k}" aria-pressed="${sub === k}">${l}</button>`).join("")}</div>`;
+  const head = `<header class="top"><div><div class="brand">Bons plans</div><div class="updated">Prix PC dans ${COUNTRIES.length} pays, PS5 par région, jeux gratuits</div></div></header>`;
+  const needKey = `<div class="box stack"><h3>Il faut une clé gratuite</h3>
+    <p class="muted">Les prix PC viennent d'IsThereAnyDeal, qui suit les stores officiels dans chaque pays.</p>
     <ol class="steps"><li>Crée un compte IsThereAnyDeal.</li><li>Va dans <b>Apps</b>, crée une app (nom libre).</li><li>Copie la <b>API Key</b> (pas l'OAuth Client ID).</li></ol>
     <button class="btn block" data-url="https://isthereanydeal.com/apps/my/">${ICON.ext} Obtenir ma clé</button>
     <div class="field"><label for="ik">Clé API</label><input id="ik" class="input" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
-    <button class="btn primary block" data-act="save-itad">Enregistrer</button></div></div>`;
+    <button class="btn primary block" data-act="save-itad">Enregistrer</button></div>`;
   let body = "";
-  if (P.loading) body = `<div class="skel" style="height:220px"></div>`;
-  else if (P.game && P.rows) {
-    const best = P.rows[0];
-    const low = P.low ? `<p class="small muted">Plus bas historique en France : <b class="num">${fmtLocal(P.low.amount, P.low.currency)}</b>${best && P.low.amount && best.eur <= P.low.amount * 1.1 ? ' · <span class="ok">bonne affaire</span>' : ""}</p>` : "";
-    body = `<button class="btn" data-act="price-back">${ICON.back} Autres résultats</button>
-      <div class="stack"><h2>${esc(P.game.title)}</h2>${low}</div>
-      <div class="card">${P.rows.map((r, i) => {
-        const risk = riskOf(r.shop, r.country);
-        return `<button class="price-row${i === 0 ? " best" : ""}" style="width:100%;text-align:left" data-url="${esc(r.url)}">
-          <div class="eur num">${fmtEur(r.eur)}</div>
-          <div class="grow"><div class="row" style="gap:6px"><b>${esc(r.shop)}</b>${r.cut ? `<span class="cut">-${r.cut}%</span>` : ""}</div>
-          <div class="tiny muted">${FLAG(r.country)} ${esc((COUNTRIES.find(c => c[0] === r.country) || [])[1] || r.country)} · ${fmtLocal(r.local, r.cur)}${r.drm ? " · " + esc(r.drm) : ""}</div>
-          ${risk ? `<div class="risk ${risk[0]}">${risk[1]}</div>` : ""}</div>
-          <span class="muted">${ICON.ext.replace("<svg", '<svg width="18" height="18"')}</span></button>`;
-      }).join("")}</div>
-      <p class="tiny muted">Conversion au taux BCE du jour. Les prix étrangers peuvent exiger un compte, une carte ou une adresse du pays.</p>`;
-  } else if (P.results) {
-    body = P.results.length ? `<div class="card">${P.results.map((g, i) => `<button class="game" data-game="${i}">
-        ${g.assets && (g.assets.boxart || g.assets.banner145) ? `<img src="${esc(g.assets.boxart || g.assets.banner145)}" alt="" loading="lazy">` : '<img alt="">'}
-        <div class="grow"><b>${esc(g.title)}</b><div class="tiny muted">${g.type === "dlc" ? "Contenu additionnel" : "Jeu"}</div></div></button>`).join("")}</div>`
-      : `<p class="muted">Aucun jeu trouvé.</p>`;
+  if (sub === "prix") {
+    const plat = `<div class="seg small-seg">${[["pc", "PC"], ["ps5", "PS5"]].map(([k, l]) => `<button data-plat="${k}" aria-pressed="${P.platform === k}">${l}</button>`).join("")}</div>`;
+    const form = `<form class="row" data-form="price"><input class="search grow" type="search" placeholder="Nom du jeu…" value="${esc(P.q)}" data-input="price" enterkeyhint="search"><button class="btn primary" type="submit">OK</button></form>`;
+    const err = P.error ? `<p class="small err">${esc(P.error)}</p>` : "";
+    if (P.platform === "ps5") {
+      body = plat + form + (P.psq ? ps5Links(P.psq) : `<div class="empty">${ICON.tag}<p class="muted">Tape le nom d'un jeu PS5 pour ouvrir sa page dans les stores de chaque région.</p></div>`);
+    } else if (!S.settings.itad) body = plat + needKey;
+    else {
+      let res;
+      if (P.loading) res = `<div class="skel" style="height:220px"></div>`;
+      else if (P.game && P.rows) {
+        const best = P.rows[0], w = wishOf(P.game.id);
+        const low = P.low ? `<p class="small muted">Plus bas historique en France : <b class="num">${fmtLocal(P.low.amount, P.low.currency)}</b>${isDeal(best, P.low) ? ' · <span class="ok">bonne affaire</span>' : ""}</p>` : "";
+        res = `<button class="btn" data-act="price-back">${ICON.back} Autres résultats</button>
+          <div class="stack"><h2>${esc(P.game.title)}</h2>${low}
+          <button class="btn ${w ? "" : "primary "}block" data-act="wish-add">${ICON.bell} ${w ? `Suivi sous ${fmtEur(w.target)} · modifier` : "Suivre ce jeu et m'alerter"}</button></div>
+          <div class="card">${P.rows.map(priceRow).join("")}</div>
+          <p class="tiny muted">Conversion au taux BCE du jour. Les prix étrangers peuvent exiger un compte, une carte ou une adresse du pays.</p>
+          ${ps5Links(P.game.title)}`;
+      } else if (P.results) {
+        res = P.results.length ? `<div class="card">${P.results.map((g, i) => `<button class="game" data-game="${i}">
+            ${g.assets && (g.assets.boxart || g.assets.banner145) ? `<img src="${esc(g.assets.boxart || g.assets.banner145)}" alt="" loading="lazy">` : '<img alt="">'}
+            <div class="grow"><b>${esc(g.title)}</b><div class="tiny muted">${g.type === "dlc" ? "Contenu additionnel" : "Jeu"}${wishOf(g.id) ? " · suivi" : ""}</div></div></button>`).join("")}</div>`
+          : `<p class="muted">Aucun jeu trouvé.</p>`;
+      } else res = `<div class="empty">${ICON.tag}<p class="muted">Tape le nom d'un jeu PC pour voir l'offre la moins chère, tous pays confondus.</p></div>`;
+      body = plat + form + err + res;
+    }
+  } else if (sub === "liste") {
+    if (!S.settings.itad) body = needKey;
+    else if (!S.wish.length) body = `<div class="empty">${ICON.bell}<p class="muted">Ta liste est vide. Cherche un jeu dans <b>Prix</b> et touche « Suivre ce jeu » : tu seras alerté quand il passe sous ton prix.</p></div>`;
+    else {
+      const map = (S.wishPrices && S.wishPrices.map) || {};
+      body = `<div class="row between"><span class="tiny muted">${S.wishPrices ? "Vérifié " + ago(S.wishPrices.at / 1000) : "Pas encore vérifié"}${Plug.BackgroundRunner ? " · vérification auto toutes les 2 h" : ""}</span>
+        <button class="btn" data-act="wish-check">${S.wishLoading ? "…" : "Vérifier"}</button></div>
+        <div class="card">${S.wish.map(w => {
+          const r = map[w.id] || {}, best = r.rows && r.rows[0];
+          const hit = best && best.eur <= w.target;
+          return `<div class="wish${hit ? " hit" : ""}">
+            ${w.art ? `<img src="${esc(w.art)}" alt="" loading="lazy">` : '<img alt="">'}
+            <div class="grow"><b>${esc(w.title)}</b>
+              <div class="tiny muted">Objectif ${fmtEur(w.target)}${r.low ? " · plus bas " + fmtLocal(r.low.amount, r.low.currency) : ""}</div>
+              ${best ? `<button class="wish-best" data-url="${esc(best.url)}"><b class="num">${fmtEur(best.eur)}</b> ${esc(best.shop)} · ${FLAG(best.country)}${hit ? ' <span class="ok">sous ton objectif</span>' : isDeal(best, r.low) ? ' <span class="ok">bonne affaire</span>' : ""}</button>` : '<div class="tiny muted">Prix à vérifier</div>'}</div>
+            <div class="wish-act"><button class="iconbtn" data-wish-edit="${esc(w.id)}" aria-label="Modifier l'objectif">${ICON.gear}</button>
+            <button class="iconbtn" data-wish-del="${esc(w.id)}" aria-label="Retirer">${ICON.close}</button></div></div>`;
+        }).join("")}</div>`;
+    }
   } else {
-    body = `<div class="empty">${ICON.tag}<p class="muted">Tape le nom d'un jeu PC pour voir l'offre la moins chère, tous pays confondus.</p></div>`;
+    const ps = psPlusItem();
+    const list = S.free && S.free.items;
+    body = `${ps ? `<button class="card" data-open="${ps.id}"><div class="item"><div class="txt"><span class="badge b-ps5" style="align-self:flex-start">PS Plus du mois</span><h3>${esc(ps.title)}</h3><div class="meta">${esc(ps.source)} · ${ago(ps.published)}</div></div>${ps.image ? `<div class="thumb" ${bg(ps.image)}></div>` : ""}</div></button>` : ""}
+      ${S.freeLoading && !list ? `<div class="skel" style="height:200px"></div>` : ""}
+      ${list && list.length ? list.map(g => `<div class="card free"><div class="media" ${bg(g.image || g.thumbnail)}></div><div class="body">
+          <div class="row between"><b>${esc(g.title)}</b>${g.worth && g.worth !== "N/A" ? `<span class="tiny muted"><s>${esc(g.worth)}</s></span>` : ""}</div>
+          <div class="tiny muted">${esc(g.platforms || "")}${g.end_date && g.end_date !== "N/A" ? " · jusqu'au " + new Date(g.end_date.replace(" ", "T")).toLocaleDateString("fr-FR", { day: "numeric", month: "long" }) : ""}</div>
+          <button class="btn primary block" data-url="${esc(g.open_giveaway_url || g.gamerpower_url)}">${ICON.ext} Récupérer</button></div></div>`).join("")
+        : list ? '<p class="muted">Aucun jeu gratuit en ce moment.</p>' : ""}
+      <p class="tiny muted">Source : GamerPower. Certains jeux demandent un compte Epic, Steam, GOG ou PlayStation.</p>`;
   }
-  const err = P.error ? `<p class="small err">${esc(P.error)}</p>` : "";
-  return `<div class="stack">${head}
-    <form class="row" data-form="price"><input class="search grow" type="search" placeholder="Nom du jeu…" value="${esc(P.q)}" data-input="price" enterkeyhint="search"><button class="btn primary" type="submit">OK</button></form>
-    ${err}${body}</div>`;
+  return `<div class="stack">${head}${seg}${body}</div>`;
 }
 
 /* ----- Réglages ----- */
@@ -456,6 +641,11 @@ function viewReglages() {
     <div class="box stack"><h3>Skin</h3>
       <div class="skins">${SKINS.map(k => `<button class="skin-card" data-skin="${k.id}" aria-pressed="${skin() === k.id}"><div class="sw" style="background:${k.colors[0]}">${k.colors.slice(1).map(c => `<i style="background:${c}"></i>`).join("")}</div><div class="nm">${k.name}</div></button>`).join("")}</div>
       <p class="tiny muted">Astuce : le bouton palette en haut du fil passe au skin suivant.</p>
+    </div>
+    <div class="box stack"><h3>Notifications</h3>
+      <label class="switch"><span>Brief du matin<div class="tiny muted">Rappel quotidien quand le brief est prêt</div></span><input type="checkbox" data-set="briefNotif" ${S.settings.briefNotif ? "checked" : ""}></label>
+      <label class="switch"><span>Heure du rappel</span><input type="time" class="input" style="width:120px" value="${esc(S.settings.briefTime)}" data-set="briefTime"></label>
+      <p class="tiny muted">Les alertes de prix se règlent jeu par jeu dans Bons plans → Ma liste.</p>
     </div>
     <div class="box stack"><h3>Lecture audio</h3>
       <div class="switch"><span>Voix humaine (préparée par le robot)<div class="tiny muted">Sinon, voix Android</div></span><input type="checkbox" data-set="voice" ${S.settings.voice === "humaine" ? "checked" : ""}></div>
@@ -475,22 +665,38 @@ function viewReglages() {
 
 /* ----- article ----- */
 function findItem(id) { return allItems().find(i => i.id === id); }
+const STATUS_TXT = { rumeur: ["Rumeur non confirmée.", "Ces infos viennent de fuites ou d'insiders et peuvent se révéler fausses."], confirme: ["Confirmé.", "Une source officielle a confirmé l'information."], dementi: ["Démenti.", "L'information a été démentie ou contestée."] };
+function relBar(n) {
+  return `<span class="rel" aria-label="Fiabilité ${n} sur 5">${[1, 2, 3, 4, 5].map(k => `<i class="${k <= n ? "on" : ""}"></i>`).join("")}</span>`;
+}
 function openArticle(id) {
   const it = findItem(id);
   if (!it) return;
   markRead(id);
-  const media = it.video
-    ? `<div class="art-media" ${bg(it.image || `https://i.ytimg.com/vi/${it.video}/hqdefault.jpg`)} data-yt="${esc(it.video)}"><div class="play"><span>${ICON.play}</span></div></div>`
-    : it.image ? `<div class="art-media" ${bg(it.image)}></div>` : "";
-  const also = (it.also || []).length ? `<div class="section-t">Aussi relayé par</div><div class="list">${it.also.map(a => `<button data-url="${esc(a.url)}"><div class="grow"><b class="small">${esc(a.source)}</b><div class="small muted">${esc(a.title)}</div></div>${ICON.ext.replace("<svg", '<svg width="18" height="18"')}</button>`).join("")}</div>` : "";
-  const warn = it.rumor ? `<div class="warn"><b>Rumeur non confirmée.</b> Ces infos viennent de fuites ou d'insiders et peuvent se révéler fausses.</div>` : "";
+  const vid = it.video || it.trailer;
+  const media = vid
+    ? `<div class="art-media" ${bg(it.image || pic(it) || `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`)} data-yt="${esc(vid)}"><div class="play"><span>${ICON.play}</span></div></div>`
+    : pic(it) ? `<div class="art-media" ${bg(pic(it))}></div>` : "";
+  const art = it.article;
+  const st = art ? art.status : (it.rumor ? "rumeur" : null);
+  const warn = st ? `<div class="warn ${st}"><b>${STATUS_TXT[st][0]}</b> ${STATUS_TXT[st][1]}${it.reliability ? `<div class="row" style="margin-top:8px;gap:8px"><span class="tiny">Fiabilité</span>${relBar(it.reliability)}<span class="tiny">${it.reliability}/5</span></div>` : ""}</div>` : "";
+  let story = it.summary ? `<p class="lead">${esc(it.summary)}</p>` : "";
+  if (art) {
+    const said = art.body ? art.body.split(/\n+/).map(p => `<p class="lead">${esc(p)}</p>`).join("")
+      : (art.said || []).map(p => `<p class="lead">${esc(p)}</p>`).join("") || story;
+    story = `<div class="section-t">Ce qui se dit</div>${said}
+      <div class="section-t">Qui en parle</div><div class="list">${art.who.map(w => `<button data-url="${esc(w.url)}"><div class="grow"><b class="small">${esc(w.source)}</b> ${relBar(w.reliability)}<div class="small muted">${esc(w.title)}</div></div>${ICON.ext.replace("<svg", '<svg width="18" height="18"')}</button>`).join("")}</div>
+      ${art.by === "ia" ? '<p class="tiny muted">Article rédigé automatiquement à partir des sources ci-dessus.</p>' : ""}`;
+  }
+  const gallery = (it.gallery || []).length ? `<div class="section-t">${it.game ? esc(it.game) + " · " : ""}Images officielles</div><div class="gallery">${it.gallery.map(u => `<img src="${esc(u)}" alt="" loading="lazy">`).join("")}</div>` : "";
+  const also = !art && (it.also || []).length ? `<div class="section-t">Aussi relayé par</div><div class="list">${it.also.map(a => `<button data-url="${esc(a.url)}"><div class="grow"><b class="small">${esc(a.source)}</b><div class="small muted">${esc(a.title)}</div></div>${ICON.ext.replace("<svg", '<svg width="18" height="18"')}</button>`).join("")}</div>` : "";
   const orig = it.translated ? `<p class="orig">Titre original : ${esc(it.title_orig)}</p>` : "";
   $("#sheet-root").innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="sheet-in art stack">
       <div class="row between"><button class="iconbtn" data-act="close" aria-label="Retour">${ICON.back}</button>${badges(it)}</div>
       ${media}${meta(it)}<h1>${esc(it.title)}</h1>${warn}
-      ${it.summary ? `<p class="lead">${esc(it.summary)}</p>` : ""}${orig}
+      ${story}${orig}
       <div class="btns"><button class="btn primary" data-listen="${it.id}">${ICON.headphones} Écouter</button><button class="btn" data-url="${esc(it.url)}">${ICON.ext} Lire la source</button></div>
-      ${also}</div></div>`;
+      ${gallery}${also}</div></div>`;
   document.body.style.overflow = "hidden";
 }
 function closeSheet() {
@@ -505,7 +711,7 @@ P.audio.addEventListener("timeupdate", () => { const b = $("#pbar"); if (b && P.
 P.audio.addEventListener("ended", () => nextTrack());
 P.audio.addEventListener("error", () => { if (P.item && !P.tts && P.audio.src) speakTts(P.item); });
 
-function spoken(it) { return `${it.title}. ${it.summary || ""}`.replace(/https?:\/\/\S+/g, ""); }
+function spoken(it) { return (it.text || `${it.title}. ${it.summary || ""}`).replace(/https?:\/\/\S+/g, ""); }
 async function speakTts(it) {
   if (P.tts && P.item === it) return;
   P.tts = true; P.playing = true; renderPlayer();
@@ -523,7 +729,7 @@ async function playItem(it) {
   P.item = it; P.playing = true; P.tts = false; renderPlayer();
   if (it.audio && S.settings.voice === "humaine") {
     try {
-      const src = await gh(`audio/${it.id}.mp3`, "blob");
+      const src = await gh(it.audioPath || `audio/${it.id}.mp3`, "blob");
       if (P.item !== it) return;
       if (P.url && P.url.startsWith("blob:")) URL.revokeObjectURL(P.url);
       P.url = src;
@@ -567,14 +773,14 @@ function renderPlayer() {
 
 /* ---------- navigation ---------- */
 function renderNav() {
-  const tabs = [["fil", "Fil", ICON.news], ["prix", "Prix PC", ICON.tag], ["reglages", "Réglages", ICON.gear]];
+  const tabs = [["fil", "Fil", ICON.news], ["plans", "Bons plans", ICON.tag], ["reglages", "Réglages", ICON.gear]];
   $("#nav").innerHTML = `<div class="nav-in">${tabs.map(([k, l, i], n) => `<button data-tab="${k}" ${S.tab === k ? 'aria-current="page"' : ""}>${i}<span><span class="slot">${n + 1} </span>${l}</span></button>`).join("")}</div>`;
 }
 function render() {
   const app = $("#app");
   const focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.input;
   const caret = focused ? document.activeElement.selectionStart : null;
-  app.innerHTML = S.tab === "fil" ? viewFil() : S.tab === "prix" ? viewPrix() : viewReglages();
+  app.innerHTML = S.tab === "fil" ? viewFil() : S.tab === "plans" ? viewPlans() : viewReglages();
   renderNav();
   if (focused) { const el = app.querySelector(`[data-input="${focused}"]`); if (el) { el.focus(); try { el.setSelectionRange(caret, caret); } catch {} } }
 }
@@ -588,7 +794,11 @@ document.addEventListener("click", e => {
   if (d.yt) { t.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(d.yt)}?autoplay=1&playsinline=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" title="Vidéo"></iframe>`; t.removeAttribute("data-yt"); t.style.backgroundImage = "none"; return; }
   if (d.listen) { const it = findItem(d.listen); P.queue = []; P.idx = -1; if (it) playItem(it); return; }
   if (d.filter) { S.filter = d.filter; store.set("filter", S.filter); S.shown = PAGE; render(); window.scrollTo(0, 0); return; }
-  if (d.tab) { S.tab = d.tab; render(); window.scrollTo(0, 0); return; }
+  if (d.tab) { S.tab = d.tab; if (d.tab === "plans") { loadFree(); if (S.wish.length && (!S.wishPrices || Date.now() - S.wishPrices.at > 3600e3)) checkWishlist(false); } render(); window.scrollTo(0, 0); return; }
+  if (d.plans) { S.plansTab = d.plans; if (d.plans === "gratuits") loadFree(); return render(); }
+  if (d.plat) { S.price.platform = d.plat; S.price.results = null; S.price.game = null; S.price.rows = null; S.price.psq = ""; S.price.error = null; return render(); }
+  if (d.wishDel) { S.wish = S.wish.filter(w => w.id !== d.wishDel); saveWish(); return render(); }
+  if (d.wishEdit) { const w = wishOf(d.wishEdit); if (w) addWish({ id: w.id, title: w.title, assets: { boxart: w.art } }, null); return; }
   if (d.skin && t.classList.contains("skin-card")) { S.settings.skin = d.skin; saveSettings(); applySkin(); return render(); }
   if (d.game != null) return loadPrices(S.price.results[+d.game]);
   switch (d.act) {
@@ -609,18 +819,28 @@ document.addEventListener("click", e => {
       if (!v) return toast("Colle d'abord le code");
       S.settings.token = v; saveSettings(); return loadFeed();
     }
-    case "save-itad": { S.settings.itad = $("#ik").value.trim(); saveSettings(); return render(); }
+    case "save-itad": { S.settings.itad = $("#ik").value.trim(); saveSettings(); syncRunner(); return render(); }
     case "save-keys": {
       S.settings.token = $("#tk2").value.trim(); S.settings.itad = $("#ik2").value.trim(); saveSettings();
       toast("Enregistré"); return loadFeed();
     }
     case "price-back": S.price.game = null; S.price.rows = null; return render();
+    case "wish-add": return addWish(S.price.game, S.price.rows && S.price.rows[0]);
+    case "wish-check": return checkWishlist(true);
+    case "brief-open": return openBrief();
+    case "brief-play": {
+      const b = S.brief; if (!b) return;
+      P.queue = []; P.idx = -1;
+      return playItem({ id: "brief", title: "Brief du " + b.label, source: "AnounisGaming", audio: b.audio, audioPath: "brief.mp3", text: b.text });
+    }
   }
 });
 document.addEventListener("change", e => {
   const t = e.target;
   if (t.dataset.src) { t.checked ? S.hidden.delete(t.dataset.src) : S.hidden.add(t.dataset.src); store.set("hiddenSources", [...S.hidden]); }
   if (t.dataset.set === "voice") { S.settings.voice = t.checked ? "humaine" : "android"; saveSettings(); }
+  if (t.dataset.set === "briefNotif") { S.settings.briefNotif = t.checked; saveSettings(); setupBriefNotification(); }
+  if (t.dataset.set === "briefTime") { S.settings.briefTime = t.value || "07:40"; saveSettings(); setupBriefNotification(); }
   if (t.dataset.set === "rate") { S.settings.rate = +t.value; saveSettings(); P.audio.playbackRate = S.settings.rate; render(); }
 });
 let qTimer;
@@ -639,10 +859,16 @@ if (Plug.App) {
     if (S.tab !== "fil") { S.tab = "fil"; return render(); }
     Plug.App.exitApp();
   });
-  Plug.App.addListener("resume", () => { if (S.feed && Date.now() / 1000 - S.feed.updated > 1800) loadFeed(); });
+  Plug.App.addListener("resume", () => {
+    if (S.feed && Date.now() / 1000 - S.feed.updated > 1800) loadFeed();
+    if (S.wish.length && (!S.wishPrices || Date.now() - S.wishPrices.at > 3600e3)) checkWishlist(false);
+  });
 }
 
 applySkin();
 render();
 loadFeed();
 loadReddit();
+setupBriefNotification();
+syncRunner();
+if (S.wish.length && (!S.wishPrices || Date.now() - S.wishPrices.at > 3600e3)) checkWishlist(false);

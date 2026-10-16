@@ -19,6 +19,8 @@ ${head}</head>
 </html>
 `);
 fs.copyFileSync(path.join(src, "app.js"), path.join(dist, "app.js"));
+fs.mkdirSync(path.join(dist, "runners"), { recursive: true });
+fs.copyFileSync(path.join(src, "runners", "runner.js"), path.join(dist, "runners", "runner.js"));
 const nm = path.join(root, "node_modules");
 const fonts = [
   ["@fontsource-variable/space-grotesk/files/space-grotesk-latin-wght-normal.woff2", "space-grotesk.woff2"],

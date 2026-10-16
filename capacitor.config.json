@@ -2,5 +2,20 @@
   "appId": "fr.anounis.gaming",
   "appName": "AnounisGaming",
   "webDir": "dist",
-  "android": { "backgroundColor": "#0B0D12" }
+  "android": {
+    "backgroundColor": "#0B0D12"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "iconColor": "#FF4655"
+    },
+    "BackgroundRunner": {
+      "label": "fr.anounis.gaming.check",
+      "src": "runners/runner.js",
+      "event": "checkPrices",
+      "repeat": true,
+      "interval": 120,
+      "autoStart": true
+    }
+  }
 }

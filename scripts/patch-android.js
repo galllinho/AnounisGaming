@@ -3,7 +3,7 @@ const fs = require("fs"), path = require("path");
 const root = path.join(__dirname, "..");
 const man = path.join(root, "android/app/src/main/AndroidManifest.xml");
 let m = fs.readFileSync(man, "utf8");
-for (const p of ["android.permission.INTERNET", "android.permission.WAKE_LOCK"]) {
+for (const p of ["android.permission.INTERNET", "android.permission.WAKE_LOCK", "android.permission.POST_NOTIFICATIONS", "android.permission.SCHEDULE_EXACT_ALARM", "android.permission.RECEIVE_BOOT_COMPLETED", "android.permission.VIBRATE"]) {
   if (!m.includes(`"${p}"`)) m = m.replace("</manifest>", `    <uses-permission android:name="${p}" />\n</manifest>`);
 }
 // la synthèse vocale Android doit être visible depuis Android 11
@@ -34,6 +34,10 @@ if (!g.includes("signingConfigs")) {
         }
         release {
             signingConfig signingConfigs.anounis`);
+}
+// le plugin d'arrière-plan embarque son moteur JavaScript dans une bibliothèque locale
+if (!g.includes("background-runner/android/src/main/libs")) {
+  g = g.replace(/flatDir\s*\{\s*dirs ([^\n]*)/, (m, d) => `flatDir{\n        dirs ${d}\n        dirs '../../node_modules/@capacitor/background-runner/android/src/main/libs', 'libs'`);
 }
 fs.writeFileSync(gradle, g);
 
