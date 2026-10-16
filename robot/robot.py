@@ -207,7 +207,12 @@ class Translator:
                     continue
                 if r.status_code >= 400:
                     raise RuntimeError(f"GitHub Models {r.status_code} : {r.text[:200]}")
-                res = json.loads(r.json()["choices"][0]["message"]["content"]).get("t", [])
+                try:
+                    content = r.json()["choices"][0]["message"]["content"] or ""
+                    m = re.search(r"\{.*\}", content, re.S)
+                    res = json.loads(m.group(0) if m else content).get("t", [])
+                except Exception:
+                    raise RuntimeError(f"réponse illisible ({r.status_code}) : {r.text[:220]}")
                 if len(res) == len(chunk):
                     break
                 res = None
