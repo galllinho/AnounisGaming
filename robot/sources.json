@@ -1,26 +1,102 @@
 {
   "_aide": "Liste des sources lues par le robot. kind : site, officiel, reddit, video. lang : langue d'origine (auto si mélangée). Ajoute ou retire une ligne, le robot s'adapte au prochain passage.",
   "sources": [
-    {"name": "IGN", "url": "https://feeds.ign.com/ign/all", "kind": "site", "lang": "en"},
-    {"name": "GameSpot", "url": "https://www.gamespot.com/feeds/mashup/", "kind": "site", "lang": "en"},
-    {"name": "Eurogamer", "url": "https://www.eurogamer.net/feed", "kind": "site", "lang": "en"},
-    {"name": "PC Gamer", "url": "https://www.pcgamer.com/rss/", "kind": "site", "lang": "en"},
-    {"name": "Polygon", "url": "https://www.polygon.com/rss/index.xml", "kind": "site", "lang": "en"},
-    {"name": "VGC", "url": "https://www.videogameschronicle.com/feed/", "kind": "site", "lang": "en"},
-    {"name": "GamesRadar+", "url": "https://www.gamesradar.com/feeds/all/", "kind": "site", "lang": "en"},
-    {"name": "Gematsu", "url": "https://www.gematsu.com/feed", "kind": "site", "lang": "en"},
-    {"name": "4Gamer", "url": "https://www.4gamer.net/rss/index.xml", "kind": "site", "lang": "ja"},
-    {"name": "Famitsu", "url": "https://www.famitsu.com/rss/fcom_all.rdf", "kind": "site", "lang": "ja"},
-    {"name": "Jeuxvideo.com", "url": "https://www.jeuxvideo.com/rss/rss.xml", "kind": "site", "lang": "fr"},
-    {"name": "Gamekult", "url": "https://www.gamekult.com/feed.xml", "kind": "site", "lang": "fr"},
-    {"name": "Gameblog", "url": "https://www.gameblog.fr/rss.php", "kind": "site", "lang": "fr"},
-    {"name": "PlayStation Blog", "url": "https://blog.playstation.com/feed/", "kind": "officiel", "lang": "en"},
-    {"name": "Steam", "url": "https://store.steampowered.com/feeds/news/", "kind": "officiel", "lang": "en"},
-    {"name": "r/Games", "url": "https://www.reddit.com/r/Games/top/.rss?t=day", "kind": "reddit", "lang": "en"},
-    {"name": "r/PS5", "url": "https://www.reddit.com/r/PS5/top/.rss?t=day", "kind": "reddit", "lang": "en"},
-    {"name": "r/pcgaming", "url": "https://www.reddit.com/r/pcgaming/top/.rss?t=day", "kind": "reddit", "lang": "en"},
-    {"name": "r/GamingLeaksAndRumours", "url": "https://www.reddit.com/r/GamingLeaksAndRumours/top/.rss?t=day", "kind": "reddit", "lang": "en"},
-    {"name": "PlayStation (YouTube)", "url": "https://www.youtube.com/feeds/videos.xml?user=PlayStation", "kind": "video", "lang": "en"},
-    {"name": "IGN (YouTube)", "url": "https://www.youtube.com/feeds/videos.xml?user=IGNentertainment", "kind": "video", "lang": "en"}
+    {
+      "name": "IGN",
+      "url": "https://feeds.ign.com/ign/all",
+      "kind": "site",
+      "lang": "en"
+    },
+    {
+      "name": "GameSpot",
+      "url": "https://www.gamespot.com/feeds/mashup/",
+      "kind": "site",
+      "lang": "en"
+    },
+    {
+      "name": "Eurogamer",
+      "url": "https://www.eurogamer.net/feed",
+      "kind": "site",
+      "lang": "en"
+    },
+    {
+      "name": "PC Gamer",
+      "url": "https://www.pcgamer.com/rss/",
+      "kind": "site",
+      "lang": "en"
+    },
+    {
+      "name": "Polygon",
+      "url": "https://www.polygon.com/rss/index.xml",
+      "kind": "site",
+      "lang": "en"
+    },
+    {
+      "name": "VGC",
+      "url": "https://www.videogameschronicle.com/feed/",
+      "kind": "site",
+      "lang": "en"
+    },
+    {
+      "name": "GamesRadar+",
+      "url": "https://www.gamesradar.com/feeds/all/",
+      "kind": "site",
+      "lang": "en"
+    },
+    {
+      "name": "Gematsu",
+      "url": "https://www.gematsu.com/feed",
+      "kind": "site",
+      "lang": "en"
+    },
+    {
+      "name": "4Gamer",
+      "url": "https://www.4gamer.net/rss/index.xml",
+      "kind": "site",
+      "lang": "ja"
+    },
+    {
+      "name": "Jeuxvideo.com",
+      "url": "https://www.jeuxvideo.com/rss/rss.xml",
+      "kind": "site",
+      "lang": "fr"
+    },
+    {
+      "name": "Gamekult",
+      "url": "https://www.gamekult.com/feed.xml",
+      "kind": "site",
+      "lang": "fr"
+    },
+    {
+      "name": "Gameblog",
+      "url": "https://www.gameblog.fr/rss.php",
+      "kind": "site",
+      "lang": "fr"
+    },
+    {
+      "name": "PlayStation Blog",
+      "url": "https://blog.playstation.com/feed/",
+      "kind": "officiel",
+      "lang": "en"
+    },
+    {
+      "name": "Reddit",
+      "url": "https://www.reddit.com/r/Games+PS5+pcgaming+GamingLeaksAndRumours/top/.rss?t=day&limit=50",
+      "kind": "reddit",
+      "lang": "en",
+      "max": 50
+    },
+    {
+      "name": "PlayStation (YouTube)",
+      "url": "https://www.youtube.com/feeds/videos.xml?user=PlayStation",
+      "kind": "video",
+      "lang": "en"
+    },
+    {
+      "name": "IGN (YouTube)",
+      "url": "https://www.youtube.com/feeds/videos.xml?user=IGNentertainment",
+      "kind": "video",
+      "lang": "en"
+    }
   ]
 }

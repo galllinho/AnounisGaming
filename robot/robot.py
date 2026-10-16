@@ -113,7 +113,7 @@ def fetch_source(src):
         r.raise_for_status()
         feed = feedparser.parse(r.content)
         out = []
-        for e in feed.entries[:MAX_PER_SOURCE]:
+        for e in feed.entries[:src.get("max", MAX_PER_SOURCE)]:
             link = e.get("link")
             title = clean_html(e.get("title", ""))
             if not link or not title:
@@ -126,10 +126,14 @@ def fetch_source(src):
             summary = shorten(clean_html(body))
             if summary.lower().startswith(title.lower()[:40].lower()) and len(summary) < len(title) + 20:
                 summary = ""
+            name = src["name"]
+            if src["kind"] == "reddit":
+                m = re.search(r"reddit\.com/r/([^/]+)/", link)
+                name = f"r/{m.group(1)}" if m else name
             out.append({
                 "id": item_id(link),
                 "url": link,
-                "source": src["name"],
+                "source": name,
                 "kind": src["kind"],
                 "lang": src.get("lang", "auto"),
                 "published": published,
@@ -150,6 +154,7 @@ class Translator:
         self.deepl_key = os.environ.get("DEEPL_KEY", "").strip()
         self.deepl_ok = bool(self.deepl_key)
         self.used = {"deepl": 0, "google": 0, "aucune": 0}
+        self.last_error = None
 
     def _deepl(self, texts):
         host = "api-free.deepl.com" if self.deepl_key.endswith(":fx") else "api.deepl.com"
@@ -164,19 +169,36 @@ class Translator:
         r.raise_for_status()
         return [t["text"] for t in r.json()["translations"]]
 
+    def _gtx(self, text):
+        r = requests.get(
+            "https://translate.googleapis.com/translate_a/single",
+            params={"client": "gtx", "sl": "auto", "tl": "fr", "dt": "t", "q": text},
+            headers={"User-Agent": UA}, timeout=20,
+        )
+        r.raise_for_status()
+        out = "".join(seg[0] for seg in r.json()[0] if seg and seg[0])
+        if not out:
+            raise RuntimeError("réponse vide")
+        return out
+
     def _google(self, texts):
         from deep_translator import GoogleTranslator
         def one(t):
             try:
+                return self._gtx(t), False
+            except Exception as exc:
+                self.last_error = f"gtx: {exc}"
+            try:
                 return GoogleTranslator(source="auto", target="fr").translate(t) or t, False
-            except Exception:
+            except Exception as exc:
+                self.last_error = f"deep-translator: {exc}"
                 return t, True
         with ThreadPoolExecutor(max_workers=8) as pool:
             res = list(pool.map(one, texts))
         out = [r[0] for r in res]
         fails = sum(1 for r in res if r[1])
         if fails == len(texts):
-            raise RuntimeError("Google Traduction ne répond pas")
+            raise RuntimeError(f"Google Traduction ne répond pas ({self.last_error})")
         return out
 
     def translate(self, texts):
@@ -391,7 +413,10 @@ def main():
         e["first_seen"] = now
         merged[e["id"]] = e
 
-    items = [it for it in merged.values() if now - it["published"] < KEEP_HOURS * 3600]
+    names = {s["name"] for s in sources}
+    items = [it for it in merged.values()
+             if now - it["published"] < KEEP_HOURS * 3600
+             and (it["source"] in names or it["source"].startswith("r/") or args.input)]
     items.sort(key=lambda x: -x["published"])
     items = items[:MAX_ITEMS]
 
@@ -418,6 +443,7 @@ def main():
         "updated": now,
         "sources": status,
         "translation": tr.used,
+        "translation_error": tr.last_error,
         "audio_new": made,
     }, ensure_ascii=False, indent=1), "utf-8")
     heads = sum(1 for it in items if not it.get("group"))
