@@ -183,21 +183,15 @@ class Translator:
 
     def _gemini(self, texts):
         """Traduction par Gemini (clé gratuite Google AI Studio), 40 textes par demande."""
-        model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
         out = []
         for i in range(0, len(texts), 40):
             chunk = texts[i:i + 40]
             prompt = ("Traduis en français naturel chaque texte de ce tableau JSON (actualité jeu vidéo). Ne traduis pas les noms "
                       "de jeux, studios, consoles ni personnes. Réponds uniquement avec un tableau JSON de "
                       f"{len(chunk)} chaînes, dans le même ordre.\n\n" + json.dumps(chunk, ensure_ascii=False))
-            r = requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                              params={"key": self.gemini_key},
-                              json={"contents": [{"parts": [{"text": prompt}]}],
-                                    "generationConfig": {"temperature": 0, "responseMimeType": "application/json"}},
-                              timeout=90)
-            if r.status_code >= 400:
-                raise RuntimeError(f"Gemini {r.status_code} : {r.text[:160]}")
-            res = json.loads(r.json()["candidates"][0]["content"]["parts"][0]["text"])
+            text = extras.gemini_call({"contents": [{"parts": [{"text": prompt}]}],
+                                       "generationConfig": {"temperature": 0, "responseMimeType": "application/json"}})
+            res = json.loads(text)
             if not isinstance(res, list) or len(res) != len(chunk):
                 raise RuntimeError("Gemini : réponse incomplète")
             out += [str(x) for x in res]

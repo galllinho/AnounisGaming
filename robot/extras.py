@@ -155,18 +155,31 @@ class Igdb:
 
 # ---------- articles de rumeurs ----------
 
-def _gemini(prompt):
+GEMINI_MODELS = [m for m in [os.environ.get("GEMINI_MODEL", "")] if m] + ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"]
+
+
+def gemini_call(payload, timeout=90):
+    """Appelle Gemini en essayant plusieurs noms de modèle (Google en retire régulièrement)."""
     key = os.environ.get("GEMINI_KEY", "").strip()
     if not key:
         return None
-    model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-    r = requests.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-        params={"key": key}, json={"contents": [{"parts": [{"text": prompt}]}],
-                                   "generationConfig": {"temperature": 0.4, "maxOutputTokens": 900}},
-        timeout=60)
-    r.raise_for_status()
-    return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+    last = None
+    for model in GEMINI_MODELS:
+        r = requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                          params={"key": key}, json=payload, timeout=timeout)
+        if r.status_code == 404:
+            last = f"modèle {model} introuvable"
+            continue
+        if r.status_code >= 400:
+            raise RuntimeError(f"Gemini {r.status_code} : {r.text[:160]}")
+        GEMINI_MODELS[:] = [model] + [m for m in GEMINI_MODELS if m != model]
+        return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+    raise RuntimeError(last or "Gemini indisponible")
+
+
+def _gemini(prompt):
+    return gemini_call({"contents": [{"parts": [{"text": prompt}]}],
+                        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 900}}, timeout=60)
 
 
 def write_rumor(it, members, table, state):
