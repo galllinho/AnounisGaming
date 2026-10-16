@@ -162,7 +162,9 @@ class Translator:
     def __init__(self):
         self.deepl_key = os.environ.get("DEEPL_KEY", "").strip()
         self.deepl_ok = bool(self.deepl_key)
-        self.used = {"deepl": 0, "google": 0, "aucune": 0}
+        self.used = {"deepl": 0, "gemini": 0, "google": 0, "aucune": 0}
+        self.gemini_key = os.environ.get("GEMINI_KEY", "").strip()
+        self.gemini_ok = bool(self.gemini_key)
         self.last_error = None
         self.errors = []
 
@@ -178,6 +180,29 @@ class Translator:
             raise RuntimeError(f"DeepL {r.status_code}")
         r.raise_for_status()
         return [t["text"] for t in r.json()["translations"]]
+
+    def _gemini(self, texts):
+        """Traduction par Gemini (clé gratuite Google AI Studio), 40 textes par demande."""
+        model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+        out = []
+        for i in range(0, len(texts), 40):
+            chunk = texts[i:i + 40]
+            prompt = ("Traduis en français naturel chaque texte de ce tableau JSON (actualité jeu vidéo). Ne traduis pas les noms "
+                      "de jeux, studios, consoles ni personnes. Réponds uniquement avec un tableau JSON de "
+                      f"{len(chunk)} chaînes, dans le même ordre.\n\n" + json.dumps(chunk, ensure_ascii=False))
+            r = requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                              params={"key": self.gemini_key},
+                              json={"contents": [{"parts": [{"text": prompt}]}],
+                                    "generationConfig": {"temperature": 0, "responseMimeType": "application/json"}},
+                              timeout=90)
+            if r.status_code >= 400:
+                raise RuntimeError(f"Gemini {r.status_code} : {r.text[:160]}")
+            res = json.loads(r.json()["candidates"][0]["content"]["parts"][0]["text"])
+            if not isinstance(res, list) or len(res) != len(chunk):
+                raise RuntimeError("Gemini : réponse incomplète")
+            out += [str(x) for x in res]
+            time.sleep(7)
+        return out
 
     def _gtx(self, text):
         for attempt in range(3):
@@ -246,6 +271,14 @@ class Translator:
                 log("DeepL indisponible, bascule :", exc)
                 self.errors.append(f"deepl: {exc}"[:300])
                 self.deepl_ok = False
+        if result is None and self.gemini_ok:
+            try:
+                result = self._gemini(payload)
+                self.used["gemini"] += len(payload)
+            except Exception as exc:
+                log("Gemini indisponible, bascule sur Google :", exc)
+                self.errors.append(f"gemini: {exc}"[:300])
+                self.gemini_ok = False
         if result is None:
             try:
                 result = self._google(payload)

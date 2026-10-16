@@ -33,6 +33,7 @@ const S = {
   freeLoading: false,
   plansTab: "prix",
   brief: store.get("brief", null),
+  trCache: store.get("trCache", {}),
   today: store.get("today", { d: "", n: 0 }),
   reddit: store.get("reddit", null),
   redditErr: null,
@@ -144,7 +145,9 @@ async function loadFeed(manual) {
   try {
     const feed = await gh("feed.json");
     S.feed = { updated: feed.updated, items: feed.items };
+    applyPhoneTranslations();
     store.set("feed", S.feed);
+    translatePendingOnPhone();
     gh("status.json").then(s => { S.status = s; if (S.tab === "reglages") render(); }).catch(() => {});
     gh("brief.json").then(b => { S.brief = b; store.set("brief", b); render(); }).catch(() => {});
     if (manual) toast("Fil à jour");
@@ -213,6 +216,36 @@ async function loadReddit(force) {
     S.redditErr = e.message || "Reddit indisponible";
   }
   render();
+}
+
+/* textes que le robot n'a pas pu traduire : le téléphone s'en charge et garde le résultat */
+function applyPhoneTranslations() {
+  if (!S.feed) return;
+  for (const it of S.feed.items) {
+    const c = S.trCache[it.id];
+    if (c && !it.translated) { it.title = c.t; it.summary = c.s; it.translated = true; it.pending = false; }
+  }
+}
+let trBusy = false;
+async function translatePendingOnPhone() {
+  if (trBusy || !S.feed) return;
+  const todo = S.feed.items.filter(it => !it.group && !it.translated && it.lang !== "fr" && !S.trCache[it.id]).slice(0, 150);
+  if (!todo.length) return;
+  trBusy = true;
+  try {
+    for (let i = 0; i < todo.length; i += 15) {
+      const part = todo.slice(i, i + 15);
+      const tr = await translateOnPhone(part.flatMap(it => [it.title_orig, it.summary_orig || ""]));
+      part.forEach((it, k) => { if (tr[2 * k] && tr[2 * k] !== it.title_orig) S.trCache[it.id] = { t: tr[2 * k], s: tr[2 * k + 1] }; });
+      applyPhoneTranslations();
+      render();
+    }
+    const keep = new Set(S.feed.items.map(it => it.id));
+    for (const id of Object.keys(S.trCache)) if (!keep.has(id)) delete S.trCache[id];
+    store.set("trCache", S.trCache);
+    store.set("feed", S.feed);
+  } catch {}
+  trBusy = false;
 }
 
 function allItems() {
@@ -866,6 +899,7 @@ if (Plug.App) {
 }
 
 applySkin();
+applyPhoneTranslations();
 render();
 loadFeed();
 loadReddit();
