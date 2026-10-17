@@ -276,6 +276,7 @@ function allItems() {
   return base.concat(rd).sort((a, b) => b.published - a.published);
 }
 
+const FR_SOURCES = new Set(["Jeuxvideo.com", "Gamekult", "Gameblog", "ActuGaming", "Gamergen"]);
 function heads() {
   if (!S.feed && !S.reddit) return [];
   let list = allItems().filter(it => !S.hidden.has(it.source) && !isMuted(it));
@@ -283,6 +284,7 @@ function heads() {
   if (f === "ps5") list = list.filter(it => (it.platforms || []).includes("PS5"));
   else if (f === "pc") list = list.filter(it => (it.platforms || []).includes("PC"));
   else if (f === "rumeurs") list = list.filter(it => it.rumor);
+  else if (f === "fr") list = list.filter(it => it.lang === "fr" || (it.also || []).some(a => FR_SOURCES.has(a.source)));
   else if (f === "officiel") list = list.filter(it => it.kind === "officiel" || (it.also || []).some(a => a.source.includes("PlayStation Blog") || a.source === "Steam"));
   else if (f === "videos") list = list.filter(it => it.video);
   else if (f === "communaute") list = list.filter(it => it.kind === "reddit");
@@ -325,7 +327,7 @@ function card(it, hero) {
       ${pic(it) ? `<div class="thumb" ${bg(pic(it))}>${playOverlay(it)}</div>` : ""}</div></button>`;
 }
 
-const FILTERS = [["tout", "Tout"], ["ps5", "PS5"], ["pc", "PC"], ["rumeurs", "Rumeurs"], ["officiel", "Officiel"], ["videos", "Vidéos"], ["communaute", "Communauté"]];
+const FILTERS = [["tout", "Tout"], ["ps5", "PS5"], ["pc", "PC"], ["fr", "Sources FR"], ["rumeurs", "Rumeurs"], ["officiel", "Officiel"], ["videos", "Vidéos"], ["communaute", "Communauté"]];
 const filterLabel = (k, l) => skin() === "hud" && k === "rumeurs" ? "Intel" : l;
 
 function consoleHero(it) {

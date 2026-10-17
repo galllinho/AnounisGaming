@@ -74,6 +74,18 @@
       "lang": "fr"
     },
     {
+      "name": "ActuGaming",
+      "url": "https://www.actugaming.net/feed/",
+      "kind": "site",
+      "lang": "fr"
+    },
+    {
+      "name": "Gamergen",
+      "url": "https://www.gamergen.com/rss",
+      "kind": "site",
+      "lang": "fr"
+    },
+    {
       "name": "PlayStation Blog",
       "url": "https://blog.playstation.com/feed/",
       "kind": "officiel",
