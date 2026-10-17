@@ -828,7 +828,7 @@ function inGamePass(title) {
   return !!(S.gamepass && S.gamepass.titles && S.gamepass.titles.some(t => { const m = norm(t); return m === n || m.startsWith(n + " ") || n.startsWith(m + " "); }));
 }
 function relatedNews(title) {
-  const n = norm(title); if (n.length < 3) return [];
+  const n = norm(baseTitle(title)); if (n.length < 3) return [];
   return allItems().filter(it => norm(`${it.title} ${it.title_orig}`).includes(n)).slice(0, 5);
 }
 async function loadInfo(id) {
@@ -914,6 +914,8 @@ function viewAgenda() {
 
 /* ===================== Favoris (jeux auxquels je joue) ===================== */
 const favKey = title => norm(title);
+/* nom court du jeu, sans « Complete Edition », « GOTY »… (pour les recherches) */
+const baseTitle = t => (t || "").replace(/\s*[-–:]\s*(the\s+)?(complete|definitive|deluxe|ultimate|gold|goty|game of the year|director'?s cut|remastered|anniversary|enhanced|standard|premium|collector'?s)(\s+edition)?\s*$/i, "").replace(/\s+(complete|definitive|deluxe|ultimate|goty|game of the year)\s+edition\s*$/i, "").replace(/[™®]/g, "").trim() || t;
 const isFav = title => S.favs.some(f => f.key === favKey(title));
 const saveFavs = () => { store.set("favs", S.favs); pushWidget(); };
 function starBtn(title, extra = "") {
@@ -943,9 +945,13 @@ async function resolveFav(f) {
       const hit = r.find(g => norm(g.title) === f.key) || r[0];
       if (hit) { f.itadId = hit.id; f.art = f.art || (hit.assets && (hit.assets.boxart || hit.assets.banner300)) || null; }
     }
-    if (f.itadId && f.appid == null) {
+    if (f.itadId && !f.appid) {
       const info = await loadInfo(f.itadId);
       f.appid = info.appid || 0;
+      if (!f.appid && baseTitle(f.title) !== f.title) {
+        const r2 = await http("GET", `https://api.isthereanydeal.com/games/search/v1?key=${itadKey()}&title=${encodeURIComponent(baseTitle(f.title))}&results=8`);
+        for (const g of r2) { try { const i2 = await loadInfo(g.id); if (i2.appid) { f.appid = i2.appid; break; } } catch {} }
+      }
       f.art = f.art || (info.assets && (info.assets.boxart || info.assets.banner400)) || null;
     }
     saveFavs();
@@ -958,10 +964,14 @@ const GEMINI_MODELS_APP = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-fl
 async function geminiAsk(prompt) {
   const key = (S.settings.gemini || "").trim();
   if (!key) throw new Error("nokey");
-  let last = "Gemini indisponible";
-  for (const model of GEMINI_MODELS_APP) {
+  let quota = false, last = "Gemini indisponible";
+  const tries = [];
+  for (const m of GEMINI_MODELS_APP) tries.push([m, true]);
+  for (const m of GEMINI_MODELS_APP) tries.push([m, false]);
+  for (const [model, search] of tries) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-    const body = { contents: [{ parts: [{ text: prompt }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.4 } };
+    const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4 } };
+    if (search) body.tools = [{ google_search: {} }];
     let status, data;
     try {
       if (NATIVE && Plug.CapacitorHttp) {
@@ -971,18 +981,19 @@ async function geminiAsk(prompt) {
         const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body) });
         status = r.status; data = await r.json();
       }
-    } catch (e) { last = "réseau"; continue; }
-    if (status === 400 || status === 401 || status === 403) throw new Error("La clé Gemini est refusée. Vérifie-la dans Réglages.");
-    if (status === 404 || status === 429 || status >= 500) { last = `Gemini ${status}`; continue; }
+    } catch (e) { last = "Connexion à Gemini impossible"; continue; }
+    if (status === 401 || status === 403) throw new Error("La clé Gemini est refusée. Vérifie-la dans Réglages.");
+    if (status === 429) { quota = true; continue; }
+    if (status >= 400) { last = `Gemini ${status}`; continue; }
     const cand = data.candidates && data.candidates[0];
     const text = cand && cand.content && (cand.content.parts || []).map(p => p.text || "").join("").trim();
-    if (!text) { last = "réponse vide"; continue; }
+    if (!text) { last = "Réponse vide de Gemini"; continue; }
     const chunks = (cand.groundingMetadata && cand.groundingMetadata.groundingChunks) || [];
     const sources = [];
-    for (const c of chunks) if (c.web && c.web.uri && !sources.some(s => s.title === c.web.title)) sources.push({ title: c.web.title || c.web.uri, url: c.web.uri });
-    return { text, sources: sources.slice(0, 8) };
+    for (const c of chunks) if (c.web && c.web.uri && !sources.some(x => x.title === c.web.title)) sources.push({ title: c.web.title || c.web.uri, url: c.web.uri });
+    return { text, sources: sources.slice(0, 8), web: search };
   }
-  throw new Error(last);
+  throw new Error(quota ? "Le quota gratuit de Gemini est atteint pour le moment (ta clé sert aussi au robot). Réessaie dans un moment, il se recharge chaque minute et chaque jour." : last);
 }
 function mdToHtml(md) {
   const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\*(.+?)\*/g, "<i>$1</i>");
@@ -1005,7 +1016,7 @@ async function loadTips(f, force) {
   try {
     const level = S.favLevel[f.key] || "debut";
     const lvl = { debut: "je débute le jeu", milieu: "je suis à mi-parcours", fin: "je suis en fin de jeu / post-game" }[level];
-    const prompt = `Tu es un expert du jeu vidéo « ${f.title} ». En t'appuyant sur une recherche web récente (patchs actuels), rédige en français une fiche de trucs et astuces pour un joueur PS5/PC. Contexte : ${lvl}. ` +
+    const prompt = `Tu es un expert du jeu vidéo « ${baseTitle(f.title)} ». En t'appuyant sur une recherche web récente (patchs actuels), rédige en français une fiche de trucs et astuces pour un joueur PS5/PC. Contexte : ${lvl}. ` +
       "Structure avec des titres markdown ## : « Bien démarrer », « Astuces qui changent tout », « Build / équipement conseillé » (si pertinent), « Secrets et bonus », « Erreurs à éviter ». " +
       "5 à 7 puces courtes par section, concrètes et vérifiées. AUCUN spoiler d'histoire. Pas d'introduction ni de conclusion.";
     const r = await geminiAsk(prompt);
@@ -1019,11 +1030,12 @@ async function loadTips(f, force) {
 
 /* ----- guides Reddit, mises à jour Steam ----- */
 async function loadGuides(f) {
-  if (S.guides[f.key] && Date.now() - S.guides[f.key].at < 86400e3) return;
+  const gd = S.guides[f.key];
+  if (gd && Date.now() - gd.at < (gd.posts && gd.posts.length ? 86400e3 : 3600e3)) return;
   try {
-    const q = encodeURIComponent(`"${f.title}" (tips OR guide OR advice OR astuces)`);
+    const q = encodeURIComponent(`${baseTitle(f.title)} tips`);
     const d = await http("GET", `https://www.reddit.com/search.json?q=${q}&sort=top&t=year&limit=12&type=link&raw_json=1`);
-    const posts = ((d.data && d.data.children) || []).map(c => c.data).filter(p => p && !p.over_18 && /tip|guide|advice|beginner|learn|wish i knew|psa|astuce/i.test(p.title)).slice(0, 6)
+    const posts = ((d.data && d.data.children) || []).map(c => c.data).filter(p => p && !p.over_18 && /tip|guide|advice|beginner|learn|wish i knew|psa|astuce|build|know/i.test(p.title)).slice(0, 6)
       .map(p => ({ title: p.title, url: "https://www.reddit.com" + p.permalink, sub: p.subreddit, score: p.score, comments: p.num_comments }));
     const tr = await translateOnPhone(posts.map(p => p.title));
     posts.forEach((p, i) => { p.fr = tr[i]; });
@@ -1072,11 +1084,11 @@ function drawFav(key) {
   const f = favOf(key); if (!f) return;
   const t = S.tips[key], g = S.guides[key], p = S.patches[key];
   const level = S.favLevel[key] || "debut";
-  const q = encodeURIComponent(f.title);
+  const q = encodeURIComponent(baseTitle(f.title));
   let tips;
   if (S.tipsBusy === key) tips = `<div class="skel" style="height:180px"></div><p class="tiny muted">Recherche des meilleures astuces… (10 à 30 s)</p>`;
   else if (S.tipsErr === "nokey" || (!t && !S.settings.gemini)) tips = `<div class="box stack"><p class="muted">Pour générer les astuces, colle ta clé Gemini dans <b>Réglages → Accès</b> (la même que pour le robot).</p><button class="btn" data-tab="reglages" data-act="close">Aller aux réglages</button></div>`;
-  else if (t) tips = `${mdToHtml(t.text)}${t.sources.length ? `<div class="tiny muted" style="margin-top:6px">Sources : ${t.sources.map(s => `<a href="#" data-url="${esc(s.url)}">${esc(s.title)}</a>`).join(" · ")}</div>` : ""}<p class="tiny muted">Généré ${ago(t.at / 1000)} par Gemini avec recherche web. Vérifie en jeu, un patch a pu changer les choses.</p>`;
+  else if (t) tips = `${mdToHtml(t.text)}${t.sources.length ? `<div class="tiny muted" style="margin-top:6px">Sources : ${t.sources.map(s => `<a href="#" data-url="${esc(s.url)}">${esc(s.title)}</a>`).join(" · ")}</div>` : ""}<p class="tiny muted">Généré ${ago(t.at / 1000)} par Gemini${t.web === false ? " (sans recherche web, quota atteint)" : " avec recherche web"}. Vérifie en jeu, un patch a pu changer les choses.</p>`;
   else tips = `${S.tipsErr ? `<p class="small err">${esc(S.tipsErr)}</p>` : ""}<button class="btn primary block" data-tips="${esc(key)}">Générer les astuces</button>`;
   const lv = `<div class="seg small-seg" style="width:auto">${[["debut", "Début"], ["milieu", "Milieu"], ["fin", "Fin de jeu"]].map(([k, l]) => `<button data-level="${k}" aria-pressed="${level === k}">${l}</button>`).join("")}</div>`;
   const guides = g ? (g.posts.length ? `<div class="list">${g.posts.map(x => `<button data-url="${esc(x.url)}"><div class="grow"><b class="small">${esc(x.fr || x.title)}</b><div class="tiny muted">r/${esc(x.sub)} · ${x.score} votes · ${x.comments} commentaires</div></div>${ICON.ext.replace("<svg", '<svg width="18" height="18"')}</button>`).join("")}</div>` : `<p class="small muted">Pas de fil d'astuces trouvé sur Reddit.</p>`) : `<div class="skel" style="height:80px"></div>`;

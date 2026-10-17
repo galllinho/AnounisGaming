@@ -492,7 +492,7 @@ def main():
 
     # fiabilité, articles de rumeurs, illustrations
     table = extras.source_reliability(sources)
-    ia = {"ia_left": 25, "ia_used": 0, "error": None}
+    ia = {"ia_left": 8, "ia_used": 0, "error": None}
     igdb = extras.Igdb()
     recent = sorted(groups, key=lambda g: -g[0]["published"])
     for n, (head, members) in enumerate(recent):
