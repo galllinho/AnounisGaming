@@ -45,4 +45,28 @@ const strings = path.join(root, "android/app/src/main/res/values/strings.xml");
 if (fs.existsSync(strings)) fs.writeFileSync(strings, fs.readFileSync(strings, "utf8")
   .replace(/<string name="app_name">[^<]*</, '<string name="app_name">AnounisGaming<')
   .replace(/<string name="title_activity_main">[^<]*</, '<string name="title_activity_main">AnounisGaming<'));
+// widget écran d'accueil (3 dernières infos)
+const nat = path.join(root, "native/widget");
+const javaDir = path.join(root, "android/app/src/main/java/fr/anounis/gaming");
+fs.mkdirSync(javaDir, { recursive: true });
+fs.copyFileSync(path.join(nat, "WidgetProvider.java"), path.join(javaDir, "WidgetProvider.java"));
+for (const [dir, file] of [["layout", "widget_news.xml"], ["xml", "widget_info.xml"], ["drawable", "widget_bg.xml"]]) {
+  const d = path.join(root, "android/app/src/main/res", dir);
+  fs.mkdirSync(d, { recursive: true });
+  fs.copyFileSync(path.join(nat, "res", dir, file), path.join(d, file));
+}
+let man2 = fs.readFileSync(man, "utf8");
+if (!man2.includes(".WidgetProvider")) {
+  man2 = man2.replace("</application>", `    <receiver android:name=".WidgetProvider" android:exported="false" android:label="AnounisGaming">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" />
+        </receiver>
+    </application>`);
+  fs.writeFileSync(man, man2);
+}
+if (fs.existsSync(strings)) {
+  let st = fs.readFileSync(strings, "utf8");
+  if (!st.includes("widget_desc")) st = st.replace("</resources>", '    <string name="widget_desc">Les 3 dernières infos jeux vidéo</string>\n</resources>');
+  fs.writeFileSync(strings, st);
+}
 console.log("Projet Android ajusté (versionCode " + code + ")");

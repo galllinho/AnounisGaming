@@ -401,3 +401,45 @@ def gamepass_catalog(path, now):
         return len(titles)
     except Exception as exc:
         return f"erreur : {exc}"[:160]
+
+
+# ---------- récap de la semaine (dimanche) ----------
+
+def update_week_archive(path, heads, now):
+    """Garde 8 jours d'infos (le fil n'en garde que 4) pour le récap du dimanche."""
+    try:
+        week = json.loads(path.read_text("utf-8")) if path.exists() else {}
+    except Exception:
+        week = {}
+    for h in heads:
+        if h.get("pending"):
+            continue
+        score = len(h.get("also", [])) * 2 + (2 if h["kind"] == "officiel" else 0) + (1 if h.get("video") else 0) + (1 if h.get("rumor") else 0)
+        week[h["id"]] = {"title": h["title"], "summary": h.get("summary") or "", "source": h["source"], "url": h["url"],
+                         "published": h["published"], "score": max(score, week.get(h["id"], {}).get("score", 0)), "rumor": bool(h.get("rumor"))}
+    week = {k: v for k, v in week.items() if now - v["published"] < 8 * 86400}
+    path.write_text(json.dumps(week, ensure_ascii=False), "utf-8")
+    return week
+
+
+def build_recap(week, old):
+    """Le dimanche à partir de 9 h : les 10 infos marquantes des 7 derniers jours."""
+    local = paris_now()
+    if local.weekday() != 6 or local.hour < 9:
+        return old, False
+    tag = local.strftime("%G-W%V")
+    if old and old.get("week") == tag:
+        return old, False
+    since = time.time() - 7 * 86400
+    top = sorted(([k, v] for k, v in week.items() if v["published"] >= since), key=lambda kv: (-kv[1]["score"], -kv[1]["published"]))[:10]
+    if len(top) < 5:
+        return old, False
+    first = local - timedelta(days=6)
+    label = f"du {first.day} {MOIS[first.month - 1]} au {local.day} {MOIS[local.month - 1]}"
+    parts = [f"Salut ! Voici le récap jeux vidéo de la semaine, {label}. Les dix infos qui ont marqué ces sept derniers jours."]
+    for n, (k, v) in enumerate(top, 1):
+        lead = "Côté rumeurs" if v["rumor"] else f"Numéro {n}"
+        parts.append(f"{lead} : {v['title'].rstrip(' .!?…')}. {v['summary']}".strip())
+    parts.append("Voilà pour cette semaine. Bon dimanche, et bon jeu !")
+    items = [{"id": k, "title": v["title"], "source": v["source"], "url": v["url"]} for k, v in top]
+    return {"week": tag, "label": label, "at": int(time.time()), "items": items, "text": "\n\n".join(parts), "audio": False}, True

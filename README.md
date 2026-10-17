@@ -37,3 +37,8 @@ Dans **Settings → Secrets and variables → Actions → New repository secret*
 | `GEMINI_KEY` | Les rumeurs sont rédigées comme de vrais articles (sinon : assemblées à partir des sources) | Google AI Studio, clé API gratuite |
 | `TWITCH_CLIENT_ID` et `TWITCH_CLIENT_SECRET` | Images officielles et trailers des jeux (IGDB) | dev.twitch.tv → Your Console → Register Your Application |
 | `DEEPL_KEY` | Traduction de meilleure qualité | DeepL API Free |
+
+## Favoris et widget
+
+- **Favoris** : touche l'étoile ★ d'un jeu (fiche jeu, article, résultats de recherche). Chaque favori a ses trucs et astuces (Gemini avec recherche web : colle ta clé Gemini dans **Réglages → Accès**), ses guides Reddit, ses notes de patch Steam et son actu.
+- **Widget** : appui long sur l'écran d'accueil → Widgets → AnounisGaming. Il affiche les 3 dernières infos et se rafraîchit toutes les 30 minutes environ (Android impose ce minimum).

@@ -118,7 +118,7 @@ p{margin:0}
 
 /* Navigation */
 .nav{position:fixed;left:0;right:0;bottom:0;background:rgba(11,13,18,.92);backdrop-filter:blur(14px);border-top:1px solid var(--line);z-index:20;padding-bottom:env(safe-area-inset-bottom,0px)}
-.nav-in{max-width:620px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+.nav-in{max-width:620px;margin:0 auto;display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
 .nav button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 0 9px;font-size:12px;font-weight:600;color:var(--faint)}
 .nav button svg{width:23px;height:23px}
 .nav button[aria-current="page"]{color:var(--fg)}
@@ -225,7 +225,7 @@ body[data-skin="console"] .b-more{background:rgba(255,255,255,.16)}
 body[data-skin="console"] .brand{font-size:17px;font-weight:600;gap:10px}
 body[data-skin="console"] .brand i{animation:none;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.14);box-shadow:none;border:1px solid rgba(255,255,255,.25);display:grid;place-items:center;font-style:normal;font-size:13px;font-weight:700}
 body[data-skin="console"] .brand i::after{content:"AG"}
-body[data-skin="console"] .updated{margin-left:46px}
+body[data-skin="console"] .fil-top .updated{margin-left:46px}
 body[data-skin="console"] .iconbtn{border-radius:50%;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.22)}
 body[data-skin="console"] .chip{border-radius:999px;background:rgba(255,255,255,.06);color:#DCE3F2}
 body[data-skin="console"] .chip[aria-pressed="true"]{background:#fff;color:#070B16;border-color:#fff}
@@ -365,6 +365,28 @@ body[data-skin="hud"] .live{clip-path:var(--cut);border-radius:0}
 .iconbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
 body[data-skin="hud"] .nav button{font-size:11px;letter-spacing:.5px;gap:4px}
 body[data-skin="neon"] .nav button{font-size:7px}
+
+/* ---------- Favoris ---------- */
+.star{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--surface);border:1px solid var(--line);color:var(--muted);flex:none}
+.star svg,.star-inline svg{width:22px;height:22px}
+.star.on{color:var(--rumor);border-color:var(--rumor)}
+.star-inline{width:40px;height:40px;display:grid;place-items:center;color:var(--muted);flex:none}
+.favgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.favtile{display:flex;flex-direction:column;gap:6px;text-align:left}
+.favtile .ph{aspect-ratio:3/4;border-radius:14px;background:var(--surface2) center/cover no-repeat;border:1px solid var(--line);display:grid;place-items:center}
+.favtile .ph span{font-family:var(--display);font-size:34px;font-weight:700;color:var(--muted)}
+.favtile b{font-size:15px;line-height:1.25}
+ul.tips{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:7px;font-size:15px;line-height:1.45}
+.blur{filter:blur(6px);user-select:none}
+.card.spoil{border-style:dashed}
+.nav button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+body[data-skin="hud"] .nav-in{gap:5px;padding:8px 6px}
+body[data-skin="hud"] .nav button{font-size:10px;letter-spacing:.3px;clip-path:polygon(7px 0,100% 0,calc(100% - 7px) 100%,0 100%)}
+body[data-skin="hud"] .nav button .slot{display:none}
+body[data-skin="neon"] .nav button{font-size:6.5px}
+body[data-skin="neon"] .star.on{box-shadow:0 0 12px rgba(255,225,77,.4)}
+body[data-skin="hud"] .star,body[data-skin="hud"] .favtile .ph{border-radius:0;clip-path:var(--cut)}
+body[data-skin="console"] .star{border-radius:50%}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 <div id="app"></div>

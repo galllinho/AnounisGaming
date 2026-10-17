@@ -522,6 +522,23 @@ def main():
     n_releases = None if args.input else extras.igdb_releases(igdb, out_dir / "releases.json", now)
     gamepass = None if args.input else extras.gamepass_catalog(out_dir / "gamepass.json", now)
 
+    # récap de la semaine (dimanche)
+    week = extras.update_week_archive(out_dir / "week.json", heads_now, now)
+    recap_path = out_dir / "recap.json"
+    try:
+        old_recap = json.loads(recap_path.read_text("utf-8")) if recap_path.exists() else None
+    except Exception:
+        old_recap = None
+    recap, recap_new = extras.build_recap(week, old_recap)
+    if recap:
+        if (recap_new or not recap.get("audio")) and not args.no_audio:
+            try:
+                asyncio.run(_speak(recap["text"], out_dir / "recap.mp3"))
+                recap["audio"] = True
+            except Exception as exc:
+                log("Audio du récap impossible :", exc)
+        recap_path.write_text(json.dumps(recap, ensure_ascii=False), "utf-8")
+
     # brief du matin
     brief_path = out_dir / "brief.json"
     old_brief = None

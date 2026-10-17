@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="14dp"
+    android:background="@drawable/widget_bg">
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="● ANOUNISGAMING" android:textColor="#FF4655" android:textSize="11sp" android:textStyle="bold" android:letterSpacing="0.08" />
+    <TextView android:id="@+id/w_t1" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp"
+        android:textColor="#EDF0F5" android:textSize="14sp" android:textStyle="bold" android:maxLines="2" android:ellipsize="end" />
+    <TextView android:id="@+id/w_s1" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="#8A94A7" android:textSize="11sp" android:maxLines="1" />
+    <TextView android:id="@+id/w_t2" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp"
+        android:textColor="#EDF0F5" android:textSize="14sp" android:textStyle="bold" android:maxLines="2" android:ellipsize="end" />
+    <TextView android:id="@+id/w_s2" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="#8A94A7" android:textSize="11sp" android:maxLines="1" />
+    <TextView android:id="@+id/w_t3" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp"
+        android:textColor="#EDF0F5" android:textSize="14sp" android:textStyle="bold" android:maxLines="2" android:ellipsize="end" />
+    <TextView android:id="@+id/w_s3" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="#8A94A7" android:textSize="11sp" android:maxLines="1" />
+</LinearLayout>
