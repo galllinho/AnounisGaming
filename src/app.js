@@ -25,7 +25,7 @@ const S = {
   status: null,
   read: new Set(store.get("read", [])),
   hidden: new Set(store.get("hiddenSources", [])),
-  settings: Object.assign({ token: "", itad: "", rate: 1, voice: "humaine", skin: "neon", briefNotif: true, briefTime: "07:40", mute: [], themes: {}, antiSpoiler: true, gemini: "" }, store.get("settings", {})),
+  settings: Object.assign({ token: "", itad: "", rate: 1, voice: "humaine", skin: "neon", briefNotif: true, briefTime: "07:40", mute: [], themes: {}, antiSpoiler: true, gemini: "", alertMajor: true, alertFavs: true }, store.get("settings", {})),
   wish: store.get("wish", []),
   wishPrices: store.get("wishPrices", null),
   wishLoading: false,
@@ -46,6 +46,7 @@ const S = {
   favLevel: store.get("favLevel", {}),
   favOpen: null, tipsBusy: null, tipsErr: null,
   revealed: new Set(),
+  live: [],
   recap: store.get("recap", null),
   today: store.get("today", { d: "", n: 0 }),
   reddit: store.get("reddit", null),
@@ -132,32 +133,28 @@ function openUrl(url) {
 }
 
 /* ---------- données (branche data du dépôt privé) ---------- */
+const RAW = `https://raw.githubusercontent.com/galllinho/AnounisGaming/${DATA_BRANCH}/`;
 async function gh(path, as = "json") {
-  if (!S.settings.token) throw new Error("token");
-  const url = `https://api.github.com/repos/${REPO}/contents/${path}?ref=${DATA_BRANCH}&t=${Date.now()}`;
-  const headers = { Authorization: `Bearer ${S.settings.token.trim()}`, Accept: "application/vnd.github.raw+json", "X-GitHub-Api-Version": "2022-11-28" };
-  let status, data;
+  const url = `${RAW}${path}?t=${Math.floor(Date.now() / 60000)}`;
+  let status;
   if (NATIVE && Plug.CapacitorHttp) {
     // couche réseau native d'Android : pas de blocage CORS
-    const r = await Plug.CapacitorHttp.request({ method: "GET", url, headers, responseType: as === "blob" ? "blob" : "text", connectTimeout: 20000, readTimeout: 60000 });
-    status = r.status; data = r.data;
+    const r = await Plug.CapacitorHttp.request({ method: "GET", url, responseType: as === "blob" ? "blob" : "text", connectTimeout: 20000, readTimeout: 60000 });
+    status = r.status;
     if (status >= 200 && status < 300) {
-      if (as === "blob") return "data:audio/mpeg;base64," + data;
-      return typeof data === "string" ? JSON.parse(data) : data;
+      if (as === "blob") return "data:audio/mpeg;base64," + r.data;
+      return typeof r.data === "string" ? JSON.parse(r.data) : r.data;
     }
   } else {
-    const r = await fetch(url, { headers, cache: "no-store" });
+    const r = await fetch(url, { cache: "no-store" });
     status = r.status;
     if (r.ok) return as === "blob" ? URL.createObjectURL(await r.blob()) : r.json();
   }
-  if (status === 401) throw new Error("Le code d'accès GitHub est refusé. Vérifie-le dans Réglages.");
-  if (status === 403) throw new Error("GitHub refuse l'accès (403) : le code doit avoir « Contents : Read-only » sur AnounisGaming.");
-  if (status === 404) throw new Error("Fil introuvable (404) : vérifie que le code donne accès au dépôt AnounisGaming.");
-  throw new Error(`GitHub répond ${status}`);
+  if (status === 404) throw new Error("Fil introuvable : le dépôt AnounisGaming doit être public (GitHub › Settings › Danger Zone).");
+  throw new Error(`Le serveur répond ${status}`);
 }
 
 async function loadFeed(manual) {
-  if (!S.settings.token) { render(); return; }
   S.loading = true; S.error = null; render();
   try {
     const feed = await gh("feed.json");
@@ -166,6 +163,7 @@ async function loadFeed(manual) {
     store.set("feed", S.feed);
     pushWidget();
     translatePendingOnPhone();
+    setTimeout(prefetchMedia, 1500);
     gh("status.json").then(s => { S.status = s; if (S.tab === "reglages") render(); }).catch(() => {});
     gh("brief.json").then(b => { S.brief = b; store.set("brief", b); render(); }).catch(() => {});
     gh("recap.json").then(d => { S.recap = d; store.set("recap", d); render(); }).catch(() => {});
@@ -273,7 +271,7 @@ async function translatePendingOnPhone() {
 function allItems() {
   const base = S.feed ? S.feed.items.filter(it => !it.group) : [];
   const rd = (S.reddit && S.reddit.items) || [];
-  return base.concat(rd).sort((a, b) => b.published - a.published);
+  return base.concat(rd, S.live).sort((a, b) => b.published - a.published);
 }
 
 const FR_SOURCES = new Set(["Jeuxvideo.com", "Gamekult", "Gameblog", "ActuGaming", "Gamergen"]);
@@ -311,7 +309,7 @@ function meta(it) {
   return `<div class="meta"><span>${esc(it.source)}</span><span class="dot"></span><span>${ago(it.published)}</span>${flag}</div>`;
 }
 const pic = it => it.image || it.cover || (it.gallery && it.gallery[0]) || (it.video ? `https://i.ytimg.com/vi/${it.video}/hqdefault.jpg` : null);
-const bg = url => url ? `style="background-image:url('${esc(url).replace(/'/g, "%27")}')"` : "";
+const bg = url => (url = local(url)) ? `style="background-image:url('${esc(url).replace(/'/g, "%27")}')"` : "";
 const playOverlay = it => it.video ? `<div class="play"><span>${ICON.play}</span></div>` : "";
 const HERO_TAG = { neon: "À la une", hud: "▶ Mission principale" };
 function card(it, hero) {
@@ -388,7 +386,6 @@ function openBrief() {
 }
 
 function viewFil() {
-  if (!S.settings.token) return viewSetup();
   const list = heads();
   const sk = skin();
   const brand = sk === "neon" ? '<span class="b1">ANOUNIS</span><span class="b2">GAMING</span>' : "<i></i>AnounisGaming";
@@ -421,24 +418,6 @@ function viewFil() {
   return `<div class="stack">${top}${eventBanner()}${briefCard()}${recapCard()}${chips}${search}${err}${rumorBoardCard()}${body}</div>`;
 }
 
-function viewSetup() {
-  return `<div class="stack">
-    <header class="top"><div class="brand"><i></i>AnounisGaming</div></header>
-    <div class="box stack">
-      <h2>Bienvenue</h2>
-      <p class="muted">Le robot de ton dépôt GitHub prépare le fil d'actu toutes les heures. Pour que l'appli puisse le lire, colle ici un code d'accès GitHub en lecture seule.</p>
-      <ol class="steps">
-        <li>Touche le bouton ci-dessous et connecte-toi à GitHub.</li>
-        <li>Nom : <b>AnounisGaming</b>, expiration : <b>No expiration</b> (ou 1 an).</li>
-        <li><b>Repository access</b> : <b>Only select repositories</b>, puis <b>AnounisGaming</b>.</li>
-        <li><b>Permissions</b> : <b>Contents</b> en <b>Read-only</b>.</li>
-        <li>Touche <b>Generate token</b>, copie le code et colle-le ici.</li>
-      </ol>
-      <button class="btn block" data-url="https://github.com/settings/personal-access-tokens/new">${ICON.ext} Créer le code sur GitHub</button>
-      <div class="field"><label for="tk">Code d'accès</label><input id="tk" class="input" placeholder="github_pat_…" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
-      <button class="btn primary block" data-act="save-token">Enregistrer et charger le fil</button>
-    </div></div>`;
-}
 
 /* ----- Bons plans : prix PC, liste de souhaits, jeux gratuits, PS5 ----- */
 const COUNTRIES = [["FR", "France"], ["GB", "Royaume-Uni"], ["US", "États-Unis"], ["CA", "Canada"], ["PL", "Pologne"], ["TR", "Turquie"], ["BR", "Brésil"], ["MX", "Mexique"], ["IN", "Inde"], ["JP", "Japon"], ["AU", "Australie"]];
@@ -619,7 +598,8 @@ async function setupBriefNotification() {
 }
 function syncRunner() {
   if (!Plug.BackgroundRunner) return;
-  Plug.BackgroundRunner.dispatchEvent({ label: "fr.anounis.gaming.check", event: "sync", details: { key: S.settings.itad.trim(), wish: S.wish.map(w => ({ id: w.id, title: w.title, target: w.target, notified: w.notified || null })), countries: COUNTRIES.map(c => c[0]) } }).catch(() => {});
+  Plug.BackgroundRunner.dispatchEvent({ label: "fr.anounis.gaming.check", event: "sync", details: { key: S.settings.itad.trim(), wish: S.wish.map(w => ({ id: w.id, title: w.title, target: w.target, notified: w.notified || null })), countries: COUNTRIES.map(c => c[0]),
+    raw: RAW, alertMajor: !!S.settings.alertMajor, alertFavs: !!S.settings.alertFavs, favs: (S.favs || []).map(f => ({ key: norm(baseTitle(f.title)), title: f.title })) } }).catch(() => {});
 }
 
 /* ----- jeux gratuits (GamerPower) ----- */
@@ -702,7 +682,7 @@ function viewPlans() {
     body = `${ps ? `<button class="card" data-open="${ps.id}"><div class="item"><div class="txt"><span class="badge b-ps5" style="align-self:flex-start">PS Plus du mois</span><h3>${esc(ps.title)}</h3><div class="meta">${esc(ps.source)} · ${ago(ps.published)}</div></div>${ps.image ? `<div class="thumb" ${bg(ps.image)}></div>` : ""}</div></button>` : ""}
       ${S.freeLoading && !list ? `<div class="skel" style="height:200px"></div>` : ""}
       ${list && list.length ? list.map(g => `<div class="card free"><div class="media" ${bg(g.image || g.thumbnail)}></div><div class="body">
-          <div class="row between"><b>${esc(g.title)}</b>${g.worth && g.worth !== "N/A" ? `<span class="tiny muted"><s>${esc(g.worth)}</s></span>` : ""}</div>
+          <div class="row between"><b>${esc((g.title || "").replace(/\s*\((Epic Games|Steam|GOG|PlayStation|Prime Gaming|Itch\.io|Ubisoft|EA App)[^)]*\)/i, "").replace(/\s*(Key\s*)?Giveaway\s*$/i, "").trim())}</b>${g.worth && g.worth !== "N/A" ? `<span class="tiny muted">valeur <s>${esc(g.worth)}</s></span>` : ""}</div>
           <div class="tiny muted">${esc(g.platforms || "")}${g.end_date && g.end_date !== "N/A" ? " · jusqu'au " + new Date(g.end_date.replace(" ", "T")).toLocaleDateString("fr-FR", { day: "numeric", month: "long" }) : ""}</div>
           <button class="btn primary block" data-url="${esc(g.open_giveaway_url || g.gamerpower_url)}">${ICON.ext} Récupérer</button></div></div>`).join("")
         : list ? '<p class="muted">Aucun jeu gratuit en ce moment.</p>' : ""}
@@ -768,21 +748,23 @@ function eventBanner() {
 let eventTimer = null;
 function openEvent(key) {
   const ev = EVENTS.find(e => e.key === key); if (!ev) return;
+  Promise.all([loadReddit(true), loadLive()]).then(() => { if ($("#sheet-root").innerHTML) openEvent.draw && openEvent.draw(); });
   const draw = () => {
     const since = Date.now() / 1000 - 12 * 3600;
     const list = allItems().filter(it => it.published >= since && ev.re.test(evText(it)));
     $("#sheet-root").innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="sheet-in stack">
-      <div class="row between"><button class="iconbtn" data-act="close" aria-label="Retour">${ICON.back}</button><span class="tiny muted">Actualisé ${ago(Date.now() / 1000)} · toutes les 2 min</span></div>
+      <div class="row between"><button class="iconbtn" data-act="close" aria-label="Retour">${ICON.back}</button><span class="tiny muted">Insiders et Reddit en direct · sites toutes les 15 min</span></div>
       <h1 style="font-size:26px">${esc(ev.name)}</h1>
       <button class="btn primary block" data-url="${ev.live}">${ICON.play.replace("<svg", '<svg width="16" height="16" fill="currentColor"')} Regarder le direct</button>
       ${list.length ? list.map(it => card(it, false)).join("") : '<p class="muted">Les annonces apparaîtront ici dès qu\'elles tombent.</p>'}</div></div>`;
   };
   draw();
+  openEvent.draw = draw;
   document.body.style.overflow = "hidden";
   clearInterval(eventTimer);
   eventTimer = setInterval(async () => {
     if (!$("#sheet-root").innerHTML) return clearInterval(eventTimer);
-    await Promise.all([loadFeed(false), loadReddit(true)]);
+    await Promise.all([loadFeed(false), loadReddit(true), loadLive()]);
     if ($("#sheet-root").innerHTML) draw();
   }, 120000);
 }
@@ -919,7 +901,7 @@ const favKey = title => norm(title);
 /* nom court du jeu, sans « Complete Edition », « GOTY »… (pour les recherches) */
 const baseTitle = t => (t || "").replace(/\s*[-–:]\s*(the\s+)?(complete|definitive|deluxe|ultimate|gold|goty|game of the year|director'?s cut|remastered|anniversary|enhanced|standard|premium|collector'?s)(\s+edition)?\s*$/i, "").replace(/\s+(complete|definitive|deluxe|ultimate|goty|game of the year)\s+edition\s*$/i, "").replace(/[™®]/g, "").trim() || t;
 const isFav = title => S.favs.some(f => f.key === favKey(title));
-const saveFavs = () => { store.set("favs", S.favs); pushWidget(); };
+const saveFavs = () => { store.set("favs", S.favs); pushWidget(); syncRunner(); };
 function starBtn(title, extra = "") {
   const on = isFav(title);
   return `<button class="star${on ? " on" : ""}" data-fav="${esc(title)}" ${extra} aria-label="${on ? "Retirer des favoris" : "Ajouter aux favoris"}">${on ? ICON.starOn : ICON.star}</button>`;
@@ -1130,6 +1112,127 @@ function pushWidget() {
   Plug.Preferences.set({ key: "widget", value: JSON.stringify({ at: Date.now(), items }) }).catch(() => {});
 }
 
+/* ---------- hors ligne : images et audio gardés sur le téléphone ---------- */
+const IDB = {
+  db: null,
+  open() {
+    if (this.db) return Promise.resolve(this.db);
+    return new Promise((res, rej) => {
+      try {
+        const r = indexedDB.open("anounis-media", 1);
+        r.onupgradeneeded = () => r.result.createObjectStore("m");
+        r.onsuccess = () => { this.db = r.result; res(this.db); };
+        r.onerror = () => rej(r.error);
+      } catch (e) { rej(e); }
+    });
+  },
+  async run(mode, fn) {
+    const db = await this.open();
+    return new Promise((res, rej) => { const tx = db.transaction("m", mode); const q = fn(tx.objectStore("m")); tx.oncomplete = () => res(q && q.result); tx.onerror = () => rej(tx.error); });
+  },
+  get(k) { return this.run("readonly", s => s.get(k)); },
+  put(k, v) { return this.run("readwrite", s => s.put(v, k)); },
+  del(k) { return this.run("readwrite", s => s.delete(k)); },
+  keys() { return this.run("readonly", s => s.getAllKeys()); }
+};
+const MEDIA = {};
+const local = url => (url && MEDIA[url]) || url;
+async function loadMediaCache() {
+  try {
+    for (const k of await IDB.keys()) {
+      const b = await IDB.get(k);
+      if (b) MEDIA[k] = URL.createObjectURL(b);
+    }
+  } catch {}
+}
+function b64ToBlob(b64, type) {
+  const bin = atob(b64), arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type });
+}
+async function grab(url, type) {
+  if (NATIVE && Plug.CapacitorHttp) {
+    const r = await Plug.CapacitorHttp.request({ method: "GET", url, responseType: "blob", connectTimeout: 15000, readTimeout: 30000 });
+    if (r.status >= 300 || typeof r.data !== "string") throw new Error("http");
+    if (r.data.length > 1100000) throw new Error("trop lourd");
+    return b64ToBlob(r.data, type);
+  }
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("http");
+  return r.blob();
+}
+let prefetching = false;
+async function prefetchMedia() {
+  if (prefetching || !navigator.onLine) return;
+  const conn = navigator.connection || {};
+  if (conn.saveData) return;
+  prefetching = true;
+  try {
+    const top = heads().slice(0, 30);
+    const want = new Map();
+    for (const it of top) { const u = pic(it); if (u) want.set(u, "image/jpeg"); }
+    if (S.brief && S.brief.audio && S.brief.date === localDay()) want.set(RAW + "brief.mp3", "audio/mpeg");
+    if (S.settings.voice === "humaine") for (const it of top.slice(0, 10)) if (it.audio) want.set(RAW + `audio/${it.id}.mp3`, "audio/mpeg");
+    let added = 0;
+    for (const [u, type] of want) {
+      if (MEDIA[u]) continue;
+      try { const b = await grab(u, type); await IDB.put(u, b); MEDIA[u] = URL.createObjectURL(b); added++; } catch {}
+    }
+    for (const k of Object.keys(MEDIA)) if (!want.has(k)) { try { await IDB.del(k); } catch {} URL.revokeObjectURL(MEDIA[k]); delete MEDIA[k]; }
+    if (added && S.tab === "fil" && !$("#sheet-root").innerHTML) render();
+  } catch {}
+  prefetching = false;
+}
+
+/* ---------- insiders Bluesky en direct (mode événement) ---------- */
+const LIVE_HANDLES = [["Jason Schreier", "jasonschreier.bsky.social"], ["Stephen Totilo", "stephentotilo.bsky.social"], ["Push Square", "pushsquare.com"], ["Jeff Gerstmann", "jeffgerstmann.com"]];
+async function loadLive() {
+  const since = Date.now() / 1000 - 12 * 3600, out = [];
+  await Promise.all(LIVE_HANDLES.map(async ([name, h]) => {
+    try {
+      const d = await http("GET", `https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?actor=${h}&limit=15&filter=posts_no_replies`);
+      for (const f of d.feed || []) {
+        if (f.reason) continue;
+        const p = f.post || {}, rec = p.record || {}, text = (rec.text || "").replace(/\s+/g, " ").trim();
+        const ts = Date.parse(rec.createdAt || "") / 1000;
+        if (text.length < 40 || !(ts > since)) continue;
+        const url = `https://bsky.app/profile/${h}/post/${(p.uri || "").split("/").pop()}`;
+        const emb = p.embed || {}, img = emb.images && emb.images[0] && (emb.images[0].thumb || emb.images[0].fullsize);
+        out.push(tagItem({ id: "lv" + (p.uri || url).split("/").pop(), url, source: name, kind: "bluesky", lang: "en", published: ts, title_orig: text.length > 160 ? text.slice(0, 157) + "…" : text, summary_orig: "", image: img || null }));
+      }
+    } catch {}
+  }));
+  const known = new Set(((S.feed && S.feed.items) || []).map(i => i.url));
+  const prev = new Map(S.live.map(i => [i.id, i]));
+  const fresh = out.filter(i => !known.has(i.url) && !prev.has(i.id));
+  if (fresh.length) {
+    const tr = await translateOnPhone(fresh.map(i => i.title_orig));
+    fresh.forEach((i, k) => { i.title = tr[k] || i.title_orig; i.translated = i.title !== i.title_orig; });
+  }
+  S.live = out.filter(i => !known.has(i.url)).map(i => prev.get(i.id) || i);
+}
+
+/* ---------- partage des clés entre téléphones ---------- */
+function exportKeys() {
+  const code = "AGK1:" + btoa(unescape(encodeURIComponent(JSON.stringify({ itad: S.settings.itad, gemini: S.settings.gemini }))));
+  const show = () => { $("#sheet-root").innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="sheet-in stack"><div class="row between"><button class="iconbtn" data-act="close" aria-label="Retour">${ICON.back}</button></div>
+    <h1 style="font-size:24px">Mes clés</h1><p class="muted">Envoie ce code à la personne (SMS, WhatsApp…). Elle le colle dans Réglages → Accès → Importer des clés.</p>
+    <textarea class="input" rows="4" readonly style="font-family:monospace;font-size:12px">${esc(code)}</textarea>
+    <p class="tiny muted">Ces clés sont personnelles : la personne utilisera ton quota gratuit Gemini et IsThereAnyDeal.</p></div></div>`; document.body.style.overflow = "hidden"; };
+  try { navigator.clipboard.writeText(code).then(() => toast("Code copié"), show); } catch { show(); }
+  show();
+}
+function importKeys(raw) {
+  try {
+    const m = String(raw || "").trim().match(/^AGK1:(.+)$/);
+    if (!m) throw 0;
+    const k = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
+    if (k.itad) S.settings.itad = k.itad;
+    if (k.gemini) S.settings.gemini = k.gemini;
+    saveSettings(); syncRunner(); toast("Clés importées"); render();
+  } catch { toast("Code invalide"); }
+}
+
 /* ----- Réglages ----- */
 function viewReglages() {
   const srcs = [...new Set(allItems().map(i => i.source))].sort((a, b) => a.localeCompare(b));
@@ -1142,6 +1245,9 @@ function viewReglages() {
       <p class="tiny muted">Astuce : le bouton palette en haut du fil passe au skin suivant.</p>
     </div>
     <div class="box stack"><h3>Notifications</h3>
+      <label class="switch"><span>Infos majeures<div class="tiny muted">Reprises par 3 sources ou plus, ou annonces officielles</div></span><input type="checkbox" data-set="alertMajor" ${S.settings.alertMajor ? "checked" : ""}></label>
+      <label class="switch"><span>Actu de mes favoris<div class="tiny muted">Dès qu'une info parle d'un jeu en favori</div></span><input type="checkbox" data-set="alertFavs" ${S.settings.alertFavs ? "checked" : ""}></label>
+      <p class="tiny muted">Vérifié environ toutes les 30 minutes, même appli fermée.</p>
       <label class="switch"><span>Brief du matin<div class="tiny muted">Rappel quotidien quand le brief est prêt</div></span><input type="checkbox" data-set="briefNotif" ${S.settings.briefNotif ? "checked" : ""}></label>
       <label class="switch"><span>Heure du rappel</span><input type="time" class="input" style="width:120px" value="${esc(S.settings.briefTime)}" data-set="briefTime"></label>
       <p class="tiny muted">Les alertes de prix se règlent jeu par jeu dans Bons plans → Ma liste.</p>
@@ -1163,10 +1269,10 @@ function viewReglages() {
     </div>
     <div class="box stack"><h3>État des sources</h3><div class="switch"><span>Reddit (lu par ton téléphone)</span><span class="tiny ${S.redditErr ? "err" : "ok"}">${S.redditErr ? "indisponible" : S.reddit ? S.reddit.items.length + " infos · " + ago(S.reddit.at) : "pas encore lu"}</span></div><p class="tiny muted">${st ? "Dernier passage du robot " + ago(st.updated) + " · traduction : " + Object.entries(st.translation).filter(([, v]) => v).map(([k, v]) => `${k} ${v}`).join(", ") : ""}</p>${status}</div>
     <div class="box stack"><h3>Accès</h3>
-      <div class="field"><label for="tk2">Code d'accès GitHub</label><input id="tk2" class="input" value="${esc(S.settings.token)}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
       <div class="field"><label for="ik2">Clé IsThereAnyDeal</label><input id="ik2" class="input" value="${esc(S.settings.itad)}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
       <div class="field"><label for="gk2">Clé Gemini (trucs et astuces des favoris)</label><input id="gk2" class="input" value="${esc(S.settings.gemini)}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Même clé que pour le robot"></div>
       <button class="btn primary block" data-act="save-keys">Enregistrer</button>
+      <div class="btns"><button class="btn" data-act="keys-export">Partager mes clés</button><button class="btn" data-act="keys-import">Importer des clés</button></div>
     </div>
     <p class="tiny muted" style="text-align:center">AnounisGaming · usage personnel</p></div>`;
 }
@@ -1240,7 +1346,8 @@ async function playItem(it) {
   P.item = it; P.playing = true; P.tts = false; renderPlayer();
   if (it.audio && S.settings.voice === "humaine") {
     try {
-      const src = await gh(it.audioPath || `audio/${it.id}.mp3`, "blob");
+      const path = it.audioPath || `audio/${it.id}.mp3`;
+      const src = MEDIA[RAW + path] || `${RAW}${path}?t=${Math.floor(Date.now() / 60000)}`;
       if (P.item !== it) return;
       if (P.url && P.url.startsWith("blob:")) URL.revokeObjectURL(P.url);
       P.url = src;
@@ -1344,16 +1451,13 @@ document.addEventListener("click", e => {
       if (!list.length) return toast("Tu as déjà tout lu");
       P.queue = list; P.idx = 0; playItem(list[0]); return;
     }
-    case "save-token": {
-      const v = $("#tk").value.trim();
-      if (!v) return toast("Colle d'abord le code");
-      S.settings.token = v; saveSettings(); return loadFeed();
-    }
     case "save-itad": { S.settings.itad = $("#ik").value.trim(); saveSettings(); syncRunner(); return render(); }
     case "save-keys": {
-      S.settings.token = $("#tk2").value.trim(); S.settings.itad = $("#ik2").value.trim(); S.settings.gemini = $("#gk2").value.trim(); saveSettings();
+      S.settings.itad = $("#ik2").value.trim(); S.settings.gemini = $("#gk2").value.trim(); saveSettings(); syncRunner();
       toast("Enregistré"); return loadFeed();
     }
+    case "keys-export": return exportKeys();
+    case "keys-import": { const v = prompt("Colle le code de clés (il commence par AGK1:)"); if (v) importKeys(v); return; }
     case "price-back": S.price.game = null; S.price.rows = null; return render();
     case "wish-add": return addWish(S.price.game, S.price.rows && S.price.rows[0]);
     case "wish-check": return checkWishlist(true);
@@ -1373,6 +1477,7 @@ document.addEventListener("change", e => {
   const t = e.target;
   if (t.dataset.src) { t.checked ? S.hidden.delete(t.dataset.src) : S.hidden.add(t.dataset.src); store.set("hiddenSources", [...S.hidden]); }
   if (t.dataset.set === "voice") { S.settings.voice = t.checked ? "humaine" : "android"; saveSettings(); }
+  if (t.dataset.set === "alertMajor" || t.dataset.set === "alertFavs") { S.settings[t.dataset.set] = t.checked; saveSettings(); syncRunner(); if (t.checked) askNotifPermission(); }
   if (t.dataset.set === "antiSpoiler") { S.settings.antiSpoiler = t.checked; saveSettings(); }
   if (t.dataset.theme) { S.settings.themes = Object.assign({}, S.settings.themes, { [t.dataset.theme]: t.checked }); saveSettings(); }
   if (t.dataset.set === "briefNotif") { S.settings.briefNotif = t.checked; saveSettings(); setupBriefNotification(); }
@@ -1404,6 +1509,8 @@ if (Plug.App) {
 applySkin();
 applyPhoneTranslations();
 render();
+loadMediaCache().then(() => render());
+window.addEventListener("online", () => { loadFeed(false); });
 loadFeed();
 loadReddit();
 setupBriefNotification();

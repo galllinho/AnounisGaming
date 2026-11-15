@@ -14,7 +14,7 @@
       "src": "runners/runner.js",
       "event": "checkPrices",
       "repeat": true,
-      "interval": 120,
+      "interval": 30,
       "autoStart": true
     }
   }

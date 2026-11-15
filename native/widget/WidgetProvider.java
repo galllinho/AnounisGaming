@@ -5,7 +5,6 @@ import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.view.View;
 import android.widget.RemoteViews;
 import org.json.JSONArray;
@@ -21,8 +20,10 @@ public class WidgetProvider extends AppWidgetProvider {
         for (int id : ids) {
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_news);
             try {
-                SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
-                JSONObject data = new JSONObject(prefs.getString("widget", "{}"));
+                // deux sources : l'appli (à l'ouverture) et la tâche de fond (toutes les 30 min) ; on prend la plus récente
+                JSONObject app = new JSONObject(context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE).getString("widget", "{}"));
+                JSONObject bg = new JSONObject(context.getSharedPreferences("fr.anounis.gaming.check", Context.MODE_PRIVATE).getString("widget", "{}"));
+                JSONObject data = bg.optLong("at", 0) > app.optLong("at", 0) ? bg : app;
                 JSONArray items = data.optJSONArray("items");
                 for (int i = 0; i < 3; i++) {
                     if (items != null && i < items.length()) {

@@ -14,7 +14,7 @@ L'actu jeux vidéo du monde entier, traduite en français, avec les rumeurs rep�
 
 1. Ouvre l'onglet **Actions** du dépôt et attends que « Construire l'APK » soit vert (environ 5 minutes).
 2. Va dans **Releases** et télécharge `AnounisGaming.apk` depuis ton téléphone, puis installe-le.
-3. Au premier lancement, l'appli te guide pour créer un **code d'accès GitHub en lecture seule** (le dépôt est privé).
+3. Au premier lancement, le fil s'affiche directement : aucun code ni compte n'est nécessaire (le dépôt est public).
 4. Pour les prix, crée une clé gratuite sur [IsThereAnyDeal](https://isthereanydeal.com/apps/my/) et colle-la dans l'onglet **Prix PC**.
 
 Les nouvelles versions s'installent par-dessus l'ancienne sans perdre tes réglages (même clé de signature, mot de passe : `anounisgaming`).
@@ -24,7 +24,7 @@ Les nouvelles versions s'installent par-dessus l'ancienne sans perdre tes régla
 - **Sources** : `robot/sources.json`. Ajoute ou retire une ligne, c'est pris en compte au passage suivant.
 - **Traduction** : Google Traduction gratuit par défaut. Pour une meilleure qualité, crée une clé gratuite [DeepL API Free](https://www.deepl.com/pro-api) et ajoute-la dans **Settings → Secrets and variables → Actions** sous le nom `DEEPL_KEY`.
 - **Lancer le robot à la main** : **Actions → Robot d'actu → Run workflow**.
-- **Quota gratuit** : un dépôt privé dispose de 2 000 minutes d'Actions par mois, partagées entre tes dépôts. Le robot en consomme environ 1 200. Si tu ajoutes des passages, surveille **Settings → Billing**.
+- **Rythme** : toutes les 15 minutes de 6 h à 23 h, une fois par heure la nuit. Le dépôt est public, les minutes GitHub Actions sont donc gratuites et illimitées.
 
 GitHub met en pause les tâches planifiées d'un dépôt sans activité pendant 60 jours : si le fil ne se met plus à jour, relance le robot à la main une fois.
 
@@ -42,3 +42,7 @@ Dans **Settings → Secrets and variables → Actions → New repository secret*
 
 - **Favoris** : touche l'étoile ★ d'un jeu (fiche jeu, article, résultats de recherche). Chaque favori a ses trucs et astuces (Gemini avec recherche web : colle ta clé Gemini dans **Réglages → Accès**), ses guides Reddit, ses notes de patch Steam et son actu.
 - **Widget** : appui long sur l'écran d'accueil → Widgets → AnounisGaming. Il affiche les 3 dernières infos et se rafraîchit toutes les 30 minutes environ (Android impose ce minimum).
+
+## Partager l'appli
+
+Envoie simplement l'APK : le fil, le brief et les rumeurs marchent sans rien configurer. Pour les prix et les astuces, la personne crée ses propres clés ou importe les tiennes (Réglages → Accès → Partager mes clés).

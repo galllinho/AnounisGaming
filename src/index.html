@@ -387,6 +387,16 @@ body[data-skin="neon"] .nav button{font-size:6.5px}
 body[data-skin="neon"] .star.on{box-shadow:0 0 12px rgba(255,225,77,.4)}
 body[data-skin="hud"] .star,body[data-skin="hud"] .favtile .ph{border-radius:0;clip-path:var(--cut)}
 body[data-skin="console"] .star{border-radius:50%}
+
+/* ---------- une main : boutons plus grands, onglets lisibles ---------- */
+.fil-top .row{gap:10px;flex:none}
+.fil-top > div:first-child{min-width:0}
+body[data-skin="neon"] .fil-top .brand{font-size:12px;flex-wrap:wrap}
+.fil-top .iconbtn{width:48px;height:48px}
+.fil-top .iconbtn svg{width:22px;height:22px}
+.nav button{padding:11px 0 10px;min-height:60px}
+body[data-skin="neon"] .nav button{font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.04em}
+body[data-skin="hud"] .nav button{font-size:11px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 <div id="app"></div>

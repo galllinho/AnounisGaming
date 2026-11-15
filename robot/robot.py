@@ -492,7 +492,7 @@ def main():
 
     # fiabilité, articles de rumeurs, illustrations
     table = extras.source_reliability(sources)
-    ia = {"ia_left": 8, "ia_used": 0, "error": None}
+    ia = {"ia_left": 3, "ia_used": 0, "error": None}
     igdb = extras.Igdb()
     recent = sorted(groups, key=lambda g: -g[0]["published"])
     for n, (head, members) in enumerate(recent):
@@ -519,7 +519,9 @@ def main():
     # V3 : historique des rumeurs, sorties à venir, Game Pass
     heads_now = [h for h, _ in groups]
     n_rumors = extras.update_rumor_history(out_dir / "rumors.json", heads_now, now)
-    n_releases = None if args.input else extras.igdb_releases(igdb, out_dir / "releases.json", now)
+    rel_path = out_dir / "releases.json"
+    rel_age = now - json.loads(rel_path.read_text("utf-8")).get("updated", 0) if rel_path.exists() else 1e9
+    n_releases = None if args.input or rel_age < 3 * 3600 else extras.igdb_releases(igdb, rel_path, now)
     gamepass = None if args.input else extras.gamepass_catalog(out_dir / "gamepass.json", now)
 
     # récap de la semaine (dimanche)
@@ -538,6 +540,18 @@ def main():
             except Exception as exc:
                 log("Audio du récap impossible :", exc)
         recap_path.write_text(json.dumps(recap, ensure_ascii=False), "utf-8")
+
+    # alertes : petit fichier lu par le téléphone en arrière-plan (notifications, widget)
+    fresh_heads = sorted((h for h in heads_now if now - h["published"] < 3 * 3600 and not h.get("pending")), key=lambda h: -h["published"])
+    alerts = {
+        "updated": now,
+        "items": [{"id": h["id"], "title": h["title"], "source": h["source"], "n": 1 + len(h.get("also", [])),
+                   "off": h["kind"] == "officiel", "rumor": bool(h.get("rumor")), "game": h.get("game"),
+                   "t": f"{h['title']} {h['title_orig']}"} for h in fresh_heads[:60]],
+        "latest": [{"t": h["title"], "s": h["source"], "p": h["published"]}
+                   for h in sorted((h for h in heads_now if not h.get("pending")), key=lambda h: -h["published"])[:3]],
+    }
+    (out_dir / "alerts.json").write_text(json.dumps(alerts, ensure_ascii=False), "utf-8")
 
     # brief du matin
     brief_path = out_dir / "brief.json"
