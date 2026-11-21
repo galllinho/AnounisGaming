@@ -1,0 +1,105 @@
+{
+ "updated": 1795266907,
+ "sources": {
+  "IGN": {
+   "ok": true,
+   "count": 20
+  },
+  "GameSpot": {
+   "ok": true,
+   "count": 15
+  },
+  "Eurogamer": {
+   "ok": true,
+   "count": 25
+  },
+  "PC Gamer": {
+   "ok": true,
+   "count": 25
+  },
+  "Polygon": {
+   "ok": true,
+   "count": 10
+  },
+  "VGC": {
+   "ok": true,
+   "count": 10
+  },
+  "GamesRadar+": {
+   "ok": true,
+   "count": 25
+  },
+  "Gematsu": {
+   "ok": true,
+   "count": 20
+  },
+  "4Gamer": {
+   "ok": true,
+   "count": 25
+  },
+  "Jeuxvideo.com": {
+   "ok": true,
+   "count": 20
+  },
+  "Gamekult": {
+   "ok": true,
+   "count": 25
+  },
+  "Gameblog": {
+   "ok": true,
+   "count": 13
+  },
+  "ActuGaming": {
+   "ok": true,
+   "count": 10
+  },
+  "Gamergen": {
+   "ok": true,
+   "count": 20
+  },
+  "PlayStation Blog": {
+   "ok": true,
+   "count": 10
+  },
+  "PlayStation (YouTube)": {
+   "ok": true,
+   "count": 15
+  },
+  "IGN (YouTube)": {
+   "ok": true,
+   "count": 15
+  },
+  "Jason Schreier": {
+   "ok": true,
+   "count": 25
+  },
+  "Stephen Totilo": {
+   "ok": true,
+   "count": 25
+  },
+  "Push Square": {
+   "ok": true,
+   "count": 25
+  },
+  "Jeff Gerstmann": {
+   "ok": true,
+   "count": 19
+  }
+ },
+ "translation": {
+  "deepl": 0,
+  "gemini": 39,
+  "google": 0,
+  "aucune": 0
+ },
+ "translation_error": null,
+ "translation_errors": [],
+ "rumors_ai": 0,
+ "extras_errors": [],
+ "igdb": true,
+ "brief": "2026-11-17",
+ "rumors_tracked": 360,
+ "releases": null,
+ "gamepass": null,
+ "audio_new": 30
+}
